@@ -40,9 +40,6 @@ public class BikeServiceImpl implements BikeService {
     @Autowired
     private BikeRepository bikeRepository;
 
-    //@Value("${project.image}")
-    private String uploadDir="xyz";// injected via Lombok constructor
-
     @Autowired
     private BikeMapper bikeMapper;
 
@@ -143,55 +140,6 @@ public class BikeServiceImpl implements BikeService {
 
         return bikeMapper.toResponse(updatedBike);
     }
-
-
-//    @Override
-//    public Bike getBikeById(Long id) {
-//        return bikeRepository.findById(id)
-//                .orElseThrow(() -> new RuntimeException("Bike not found with id: " + id));
-//    }
-
-
-//    @Override
-//    public BikeDTO updateBikeImage(Long bikeId, MultipartFile file) {
-//
-//        if (bikeId == null) {
-//            throw new BadRequestException("Bike id is required.");
-//        }
-//        if (file == null || file.isEmpty()) {
-//            throw new BadRequestException("Image file must be provided.");
-//        }
-//
-//        // load bike
-//        Bike bike = bikeRepository.findById(bikeId)
-//                .orElseThrow(() -> new ResourceNotFoundException("Bike not found with id: " + bikeId));
-//
-//        // store file and get stored filename
-//        String storedFileName = fileService.storeFile(uploadDir, file);
-//
-//        // Optionally: build a public URL or save only file name. Here we store the relative path:
-//        // e.g. "uploads/bikes/<storedfile>"
-//        String savedImagePath = uploadDir.endsWith("/") ? uploadDir + storedFileName : uploadDir + "/" + storedFileName;
-//
-//        // Save only filename or path depending on your usage. If you only want filename:
-//        // bike.setImageUrl(storedFileName);
-//        // I recommend storing relative path so you can serve static files easily:
-//        bike.setImageUrl(savedImagePath);
-//
-//        // persist
-//        Bike saved = bikeRepository.save(bike);
-//
-//        // map to DTO
-//        return modelMapper.map(saved, BikeDTO.class);
-//    }
-
-
-
-//    @Override
-//    public List<Bike> filterBikes(Integer minCc, Integer maxCc, Double minPrice, Double maxPrice) {
-//        // We'll implement this properly after testing basic flow
-//        return bikeRepository.findAll();
-//    }
 
 
     @Override
@@ -335,12 +283,6 @@ public class BikeServiceImpl implements BikeService {
             throw new InvalidPaginationException("Invalid sortBy field: " + sortBy);
         }
     }
-
-
-
-
-
-
 
 
     private void validateSearch(String query, int page, int size, String sortBy, String sortDir) {

@@ -59,31 +59,6 @@ public class BikeController {
         );
     }
 
-
-
-//    @PutMapping("/bikes/{bikeId}/image")
-//    public ResponseEntity<BikeDTO> updateProductImage(@PathVariable Long bikeId,
-//                                                         @RequestParam("image") MultipartFile image) throws IOException {
-//        BikeDTO updatedBikeImage = bikeService.updateBikeImage(bikeId, image);
-//        return new ResponseEntity<>(updatedBikeImage, HttpStatus.OK);
-//    }
-
-
-
-    // ✅ 5. Filter bikes
-//    @GetMapping("/filter")
-//    public ResponseEntity<?> filterBikes(
-//            @RequestParam(required = false) Integer minCc,
-//            @RequestParam(required = false) Integer maxCc,
-//            @RequestParam(required = false) Double minPrice,
-//            @RequestParam(required = false) Double maxPrice) {
-//
-//        return new ResponseEntity<>(bikeService.filterBikes(minCc, maxCc, minPrice, maxPrice), HttpStatus.OK);
-//    }
-
-    //public ResponseEntity<String> addBike(@RequestBody BikeDTO bikeDTO) {}
-
-
     @GetMapping("/filter")
     public ResponseEntity<PagedBikeResponse> filterBikes(
             @RequestParam(required = false) String type,

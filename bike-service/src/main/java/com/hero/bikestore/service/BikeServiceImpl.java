@@ -1,4 +1,4 @@
-package com.hero.bikestore.service.impl;
+package com.hero.bikestore.service;
 
 import com.hero.bikestore.api.request.BikeRequest;
 import com.hero.bikestore.dto.BikeFilterRequest;

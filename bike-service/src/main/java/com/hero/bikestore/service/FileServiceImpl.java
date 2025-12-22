@@ -1,4 +1,4 @@
-package com.hero.bikestore.service.impl;
+package com.hero.bikestore.service;
 
 import com.hero.bikestore.exception.BadRequestException;
 import com.hero.bikestore.exception.FileStorageException;

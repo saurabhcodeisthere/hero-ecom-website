@@ -57,5 +57,23 @@ services:
       - bikestore-network
     restart: always
 
+  inventory-service:
+    build: ../inventory-service
+    container_name: inventory-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_APPLICATION_NAME: inventory-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bikestore
+      SPRING_DATASOURCE_USERNAME: bikestore
+      SPRING_DATASOURCE_PASSWORD: bikestore
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    networks:
+      - bikestore-network
+    restart: always
+
 volumes:
   postgres_data:

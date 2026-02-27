@@ -93,7 +93,4 @@ public class BikeController {
                 bikeService.filterBikes(filter, page, size)
         );
     }
-
-
-
 }

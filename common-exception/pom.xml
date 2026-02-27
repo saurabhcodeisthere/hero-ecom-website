@@ -1,0 +1,5 @@
+<parent>
+    <groupId>com.hero</groupId>
+    <artifactId>hero-ecom-website</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+</parent>

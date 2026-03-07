@@ -1,12 +1,19 @@
+
 package com.hero.bikestore.service.impl;
 
 
 import com.hero.bikestore.dto.response.UserResponse;
+import com.hero.bikestore.exception.base.ResourceNotFoundException;
 import com.hero.bikestore.model.User;
+import com.hero.bikestore.model.UserRole;
+import com.hero.bikestore.model.UserStatus;
+import com.hero.bikestore.repository.UserRepository;
 import com.hero.bikestore.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -16,10 +23,10 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
 
     @Override
-    public UserResponse getOrCreateUser(String keycloakUserId) {
+    public UserResponse getOrCreateUser(String keycloakUserId,String email, String name) {
 
         User user = userRepository.findByKeycloakUserId(keycloakUserId)
-                .orElseGet(() -> createNewUser(keycloakUserId));
+                .orElseGet(() -> createNewUser(keycloakUserId,email,name));
 
         return toResponse(user);
     }
@@ -29,7 +36,7 @@ public class UserServiceImpl implements UserService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() ->
-                        new UserNotFoundException("User not found with id: " + userId));
+                        new ResourceNotFoundException("User not found with id: " + userId));
 
         return toResponse(user);
     }
@@ -38,7 +45,7 @@ public class UserServiceImpl implements UserService {
     public UserResponse blockUser(Long userId) {
 
         User user = getUserOrThrow(userId);
-        user.setActive(false);
+        user.setStatus(UserStatus.ACTIVE);
 
         return toResponse(user);
     }
@@ -47,7 +54,7 @@ public class UserServiceImpl implements UserService {
     public UserResponse activateUser(Long userId) {
 
         User user = getUserOrThrow(userId);
-        user.setActive(true);
+        user.setStatus(UserStatus.ACTIVE);
 
         return toResponse(user);
     }
@@ -63,12 +70,14 @@ public class UserServiceImpl implements UserService {
 
     // ---------- private helpers ----------
 
-    private User createNewUser(String keycloakUserId) {
+    private User createNewUser(String keycloakUserId,String email,String name) {
 
         User user = User.builder()
                 .keycloakUserId(keycloakUserId)
+                .email(email)
+                .fullName(name)
                 .role(UserRole.CUSTOMER)
-                .active(true)
+                .status(UserStatus.ACTIVE)
                 .build();
 
         return userRepository.save(user);
@@ -77,7 +86,7 @@ public class UserServiceImpl implements UserService {
     private User getUserOrThrow(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() ->
-                        new UserNotFoundException("User not found with id: " + userId));
+                        new ResourceNotFoundException("User not found with id: " + userId));
     }
 
     private UserResponse toResponse(User user) {
@@ -85,8 +94,11 @@ public class UserServiceImpl implements UserService {
                 .id(user.getId())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
-                .role(user.getRole().name())
-                .active(user.isActive())
+                .roles( user.getRoles()
+                        .stream()
+                        .map(Enum::name)
+                        .collect(Collectors.toSet()))
+                .active(user.getStatus() == UserStatus.ACTIVE)
                 .build();
     }
 }

@@ -14,7 +14,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-#      - ./init-multi-db.sql:/docker-entrypoint-initdb.d/init-multi-db.sql
+      - ./init-multi-db.sql:/docker-entrypoint-initdb.d/init-multi-db.sql
     networks:
       - bikestore-network
     healthcheck:
@@ -74,6 +74,48 @@ services:
     networks:
       - bikestore-network
     restart: always
+
+  user-service:
+    build: ../user-service
+    container_name: user-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_APPLICATION_NAME: user-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/userdb
+      SPRING_DATASOURCE_USERNAME: bikestore
+      SPRING_DATASOURCE_PASSWORD: bikestore
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    networks:
+      - bikestore-network
+    restart: always
+
+  keycloak:
+    container_name: keycloak
+    image: quay.io/keycloak/keycloak:26.4.6
+    ports:
+      - "9090:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloakdb
+      KC_DB_USERNAME: bikestore
+      KC_DB_PASSWORD: bikestore
+#      KC_HOSTNAME: local
+#      KC_HOSTNAME_PORT: 8080
+#      KC_HOSTNAME_STRICT: false
+    #      KC_HEALTH_ENABLED: "true"         # <--- REQUIRED to enable /health endpoints
+    #      KC_HTTP_ENABLED: "true"
+    command: [ "start-dev" ]
+    networks:
+      - bikestore-network
 
 volumes:
   postgres_data:

@@ -4,9 +4,11 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
-@`Table`(
+@Table(
         name="users",
         uniqueConstraints={
                 @UniqueConstraint(columnNames = "keycloack_user_id"),
@@ -32,9 +34,14 @@ public class User {
 
     private String fullName;
 
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+            name = "user_roles",
+            joinColumns = @JoinColumn(name = "user_id")
+    )
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private UserRole role;
+    @Column(name = "role")
+    private Set<UserRole> roles = new HashSet<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

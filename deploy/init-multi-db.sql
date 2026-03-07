@@ -1,1 +1,3 @@
-CREATE DATABASE bikestore;
+CREATE DATABASE inventorydb;
+CREATE DATABASE userdb;
+CREATE DATABASE keycloakdb;

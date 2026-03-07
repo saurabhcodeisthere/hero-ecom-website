@@ -2,9 +2,9 @@ package com.hero.bikestore.controller;
 
 import com.hero.bikestore.dto.response.ApiResponse;
 import com.hero.bikestore.dto.response.UserResponse;
+import com.hero.bikestore.model.UserRole;
+import com.hero.bikestore.service.UserService;
 import lombok.RequiredArgsConstructor;
-import org.apache.coyote.Response;
-import org.springframework.boot.actuate.endpoint.ApiVersion;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,11 +18,11 @@ public class AdminController {
     private final UserService userService;
 
     @PatchMapping("/{userId}/block")
-    public ResponseEntity<ApiResponse<UserResponse>> blockUser(@PathVariable Long userId){
+    public ResponseEntity<ApiResponse<UserResponse>> blockUser(@PathVariable Long userId) {
 
         UserResponse user = userService.blockUser(userId);
 
-        return new ResponseEntity.ok(
+        return ResponseEntity.ok(
 
                 ApiResponse.<UserResponse>builder()
                         .timestamp(LocalDateTime.now())
@@ -31,6 +31,7 @@ public class AdminController {
                         .data(user)
                         .build()
         );
+    }
 
         @PatchMapping("/{userId}/activate")
          public ResponseEntity<ApiResponse<UserResponse>> activateUser(@PathVariable Long userId){
@@ -48,8 +49,8 @@ public class AdminController {
         }
 
         @PatchMapping("/{userId}/role")
-        public ResponseEntity<ApiVersion<UserResponse>> changeRole(@PathVariable Long userId,
-                                                                    @RequestParam UserRole role){
+        public ResponseEntity<ApiResponse<UserResponse>> changeRole(@PathVariable Long userId,
+                                                                   @RequestParam UserRole role){
             UserResponse user = userService.changeRole(userId,role);
 
             return ResponseEntity.ok(
@@ -62,4 +63,4 @@ public class AdminController {
             );
         }
     }
-}
+

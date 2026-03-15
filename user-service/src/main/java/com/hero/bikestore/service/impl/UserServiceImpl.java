@@ -4,15 +4,22 @@ package com.hero.bikestore.service.impl;
 
 import com.hero.bikestore.dto.response.UserResponse;
 import com.hero.bikestore.exception.base.ResourceNotFoundException;
+import com.hero.bikestore.exception.base.UserBlockedException;
+import com.hero.bikestore.model.AuthenticatedUser;
 import com.hero.bikestore.model.User;
 import com.hero.bikestore.model.UserRole;
 import com.hero.bikestore.model.UserStatus;
 import com.hero.bikestore.repository.UserRepository;
 import com.hero.bikestore.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,12 +30,24 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
 
     @Override
-    public UserResponse getOrCreateUser(String keycloakUserId,String email, String name) {
+    public UserResponse getOrCreateUser() {
 
-        User user = userRepository.findByKeycloakUserId(keycloakUserId)
-                .orElseGet(() -> createNewUser(keycloakUserId,email,name));
+        AuthenticatedUser authenticatedUser = currentUser();
+
+        User user = userRepository
+                .findByKeycloakUserId(authenticatedUser.getKeycloakUserId())
+                .orElseGet(this::createNewUser);
+
+        validateUserStatus(user);
 
         return toResponse(user);
+    }
+
+    private void validateUserStatus(User user) {
+
+        if (user.getStatus() == UserStatus.BLOCKED) {
+            throw new UserBlockedException("User account is blocked");
+        }
     }
 
     @Override
@@ -38,6 +57,8 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() ->
                         new ResourceNotFoundException("User not found with id: " + userId));
 
+        validateUserStatus(user);
+
         return toResponse(user);
     }
 
@@ -45,9 +66,18 @@ public class UserServiceImpl implements UserService {
     public UserResponse blockUser(Long userId) {
 
         User user = getUserOrThrow(userId);
-        user.setStatus(UserStatus.ACTIVE);
-
+        user.setStatus(UserStatus.BLOCKED);
+        userRepository.save(user);
         return toResponse(user);
+    }
+
+    public AuthenticatedUser currentUser() {
+
+        Authentication auth =
+                SecurityContextHolder.getContext().getAuthentication();
+
+        assert auth != null;
+        return (AuthenticatedUser) auth.getPrincipal();
     }
 
     @Override
@@ -55,29 +85,23 @@ public class UserServiceImpl implements UserService {
 
         User user = getUserOrThrow(userId);
         user.setStatus(UserStatus.ACTIVE);
-
+        userRepository.save(user);
         return toResponse(user);
     }
 
-    @Override
-    public UserResponse changeRole(Long userId, UserRole role) {
-
-        User user = getUserOrThrow(userId);
-        user.setRole(role);
-
-        return toResponse(user);
-    }
 
     // ---------- private helpers ----------
 
-    private User createNewUser(String keycloakUserId,String email,String name) {
+    private User createNewUser() {
+
+        AuthenticatedUser authenticatedUser = currentUser();
 
         User user = User.builder()
-                .keycloakUserId(keycloakUserId)
-                .email(email)
-                .fullName(name)
-                .role(UserRole.CUSTOMER)
+                .keycloakUserId(authenticatedUser.getKeycloakUserId())
+                .email(authenticatedUser.getEmail())
+                .fullName(authenticatedUser.getName())
                 .status(UserStatus.ACTIVE)
+
                 .build();
 
         return userRepository.save(user);
@@ -94,10 +118,6 @@ public class UserServiceImpl implements UserService {
                 .id(user.getId())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
-                .roles( user.getRoles()
-                        .stream()
-                        .map(Enum::name)
-                        .collect(Collectors.toSet()))
                 .active(user.getStatus() == UserStatus.ACTIVE)
                 .build();
     }

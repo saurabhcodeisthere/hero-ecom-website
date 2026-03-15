@@ -117,5 +117,18 @@ services:
     networks:
       - bikestore-network
 
+  gateway-service:
+    build: ../gateway-service
+    container_name: gateway-service
+    depends_on:
+      - bike-service
+      - inventory-service
+      - user-service
+    ports:
+      - "7070:7070"
+    networks:
+      - bikestore-network
+    restart: always
+
 volumes:
   postgres_data:

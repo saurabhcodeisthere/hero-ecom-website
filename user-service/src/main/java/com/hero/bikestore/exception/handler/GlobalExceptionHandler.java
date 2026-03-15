@@ -2,6 +2,7 @@ package com.hero.bikestore.exception.handler;
 
 
 import com.hero.bikestore.exception.base.BaseException;
+import com.hero.bikestore.exception.base.UserBlockedException;
 import com.hero.bikestore.exception.model.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -40,11 +41,22 @@ public class GlobalExceptionHandler {
                 .body(response);
     }
 
+    @ExceptionHandler(UserBlockedException.class)
+    public ResponseEntity<ErrorResponse> handleBlocked(Exception ex) {
+
+        ErrorResponse response =
+                new ErrorResponse("User is Blocked", "USER_BLOCKED");
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(response);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnknown(Exception ex) {
 
         ErrorResponse response =
-                new ErrorResponse("Internal server error", "INTERNAL_ERROR");
+                new ErrorResponse("User ", "INTERNAL_ERROR");
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)

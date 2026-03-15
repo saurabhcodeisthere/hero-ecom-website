@@ -6,6 +6,7 @@ import com.hero.bikestore.model.UserRole;
 import com.hero.bikestore.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -33,6 +34,7 @@ public class AdminController {
         );
     }
 
+
         @PatchMapping("/{userId}/activate")
          public ResponseEntity<ApiResponse<UserResponse>> activateUser(@PathVariable Long userId){
 
@@ -43,21 +45,6 @@ public class AdminController {
                             .timestamp(LocalDateTime.now())
                             .status(200)
                             .message("User activated successfully")
-                            .data(user)
-                            .build()
-            );
-        }
-
-        @PatchMapping("/{userId}/role")
-        public ResponseEntity<ApiResponse<UserResponse>> changeRole(@PathVariable Long userId,
-                                                                   @RequestParam UserRole role){
-            UserResponse user = userService.changeRole(userId,role);
-
-            return ResponseEntity.ok(
-                    ApiResponse.<UserResponse>builder()
-                            .timestamp(LocalDateTime.now())
-                            .status(200)
-                            .message("User Role updated successfully")
                             .data(user)
                             .build()
             );

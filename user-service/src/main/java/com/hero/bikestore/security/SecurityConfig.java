@@ -19,10 +19,9 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    CustomAuthenticationEntryPoint entryPoint,
                                                    CustomAccessDeniedHandler accessDeniedHandler,
-                                                   KeycloakRoleConverter roleConverter) throws Exception {
+                                                   CustomJwtAuthenticationConverter customJwtAuthenticationConverter) throws Exception {
 
-        JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
-        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(roleConverter);
+
             http
                     .csrf(AbstractHttpConfigurer::disable)
 
@@ -33,7 +32,7 @@ public class SecurityConfig {
 
                     .oauth2ResourceServer(oauth2 -> oauth2
 
-                            .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
+                            .jwt(jwt -> jwt.jwtAuthenticationConverter(customJwtAuthenticationConverter))
                             .accessDeniedHandler(accessDeniedHandler)
                             .authenticationEntryPoint(entryPoint)
                     )
@@ -48,7 +47,6 @@ public class SecurityConfig {
     public JwtDecoder jwtDecoder() {
         // Point this to your Keycloak internal URL
         String jwkSetUri = "http://keycloak:8080/realms/hero-ecommerce/protocol/openid-connect/certs";
-
         return NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
     }
 }

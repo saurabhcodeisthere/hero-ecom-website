@@ -34,14 +34,8 @@ public class User {
 
     private String fullName;
 
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(
-            name = "user_roles",
-            joinColumns = @JoinColumn(name = "user_id")
-    )
-    @Enumerated(EnumType.STRING)
-    @Column(name = "role")
-    private Set<UserRole> roles = new HashSet<>();
+
+
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

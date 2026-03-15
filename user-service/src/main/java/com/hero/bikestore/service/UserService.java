@@ -9,7 +9,7 @@ public interface UserService {
      * Fetch currently logged-in user.
      * If user does not exist, create it automatically.
      */
-    UserResponse getOrCreateUser(String keycloakUserId,String email,String name);
+    UserResponse getOrCreateUser();
 
     /**
      * Get user by internal userId (service-to-service).
@@ -23,5 +23,5 @@ public interface UserService {
 
     UserResponse activateUser(Long userId);
 
-    UserResponse changeRole(Long userId, UserRole role);
+
 }

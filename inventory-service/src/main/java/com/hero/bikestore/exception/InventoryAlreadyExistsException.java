@@ -1,7 +1,9 @@
 package com.hero.bikestore.exception;
 
-public class InventoryAlreadyExistsException extends RuntimeException {
+import com.hero.bikestore.common.exception.base.BaseException;
+
+public class InventoryAlreadyExistsException extends BaseException {
     public InventoryAlreadyExistsException(String message) {
-        super(message);
+        super(message, "CONFLICT");
     }
 }

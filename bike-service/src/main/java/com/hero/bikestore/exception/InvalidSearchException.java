@@ -1,7 +1,9 @@
 package com.hero.bikestore.exception;
 
-public class InvalidSearchException extends RuntimeException {
+import com.hero.bikestore.common.exception.base.BaseException;
+
+public class InvalidSearchException extends BaseException {
     public InvalidSearchException(String message) {
-        super(message);
+        super(message, "BAD_REQUEST");
     }
 }

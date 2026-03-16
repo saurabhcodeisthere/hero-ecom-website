@@ -1,6 +1,8 @@
 package com.hero.bikestore.exception;
 
-public class BadRequestException extends RuntimeException {
+// Delegating to common-exception. Do not add logic here.
+// Kept so existing imports in this service still compile without changes.
+public class BadRequestException extends com.hero.bikestore.common.exception.base.BadRequestException {
     public BadRequestException(String message) {
         super(message);
     }

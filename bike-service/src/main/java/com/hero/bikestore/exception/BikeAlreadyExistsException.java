@@ -1,7 +1,9 @@
 package com.hero.bikestore.exception;
 
-public class BikeAlreadyExistsException extends RuntimeException {
+import com.hero.bikestore.common.exception.base.BaseException;
+
+public class BikeAlreadyExistsException extends BaseException {
     public BikeAlreadyExistsException(String message) {
-        super(message);
+        super(message, "CONFLICT");
     }
 }

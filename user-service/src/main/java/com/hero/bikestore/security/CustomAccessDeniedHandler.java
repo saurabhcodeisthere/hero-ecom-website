@@ -1,6 +1,6 @@
 package com.hero.bikestore.security;
 
-import com.hero.bikestore.exception.model.ErrorResponse;
+import com.hero.bikestore.common.exception.model.ErrorResponse;
 import com.hero.bikestore.service.UserService;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;

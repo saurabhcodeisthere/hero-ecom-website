@@ -2,25 +2,19 @@
 package com.hero.bikestore.service.impl;
 
 
+import com.hero.bikestore.common.exception.base.ResourceNotFoundException;
 import com.hero.bikestore.dto.response.UserResponse;
-import com.hero.bikestore.exception.base.ResourceNotFoundException;
 import com.hero.bikestore.exception.base.UserBlockedException;
 import com.hero.bikestore.model.AuthenticatedUser;
 import com.hero.bikestore.model.User;
-import com.hero.bikestore.model.UserRole;
 import com.hero.bikestore.model.UserStatus;
 import com.hero.bikestore.repository.UserRepository;
 import com.hero.bikestore.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor

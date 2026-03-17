@@ -1,0 +1,16 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# GATEWAY SERVICE CONFIG
+# ─────────────────────────────────────────────────────────────────────────────
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://keycloak:8080/realms/hero-ecommerce
+
+logging:
+  level:
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.security.oauth2: DEBUG

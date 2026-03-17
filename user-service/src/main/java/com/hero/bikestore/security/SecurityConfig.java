@@ -26,6 +26,12 @@ public class SecurityConfig {
                     .csrf(AbstractHttpConfigurer::disable)
 
                     .authorizeHttpRequests(auth -> auth
+                            // Swagger UI and OpenAPI spec — allow without a token so docs are browsable
+                            .requestMatchers(
+                                    "/swagger-ui.html",
+                                    "/swagger-ui/**",
+                                    "/v3/api-docs/**"
+                            ).permitAll()
                             .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                             .requestMatchers("/api/v1/users/**").hasAnyRole("CUSTOMER", "ADMIN")
                     )

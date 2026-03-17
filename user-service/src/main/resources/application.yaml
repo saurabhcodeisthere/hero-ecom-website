@@ -1,43 +1,10 @@
+# Bootstrap config — only what's needed BEFORE connecting to config server
 spring:
   application:
-    name: user-service
-
-  datasource:
-    url: jdbc:postgresql://postgres:5432/userdb
-    username: bikestore
-    password: bikestore
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:9090/realms/hero-ecommerce
+    name: user-service                               # tells config server which file to serve
+  config:
+    import: "configserver:http://config-server:8888" # where to fetch the rest of config
 
 server:
   port: 8083
-
-eureka:
-  client:
-    service-url:
-      defaultZone: http://discovery-service:8761/eureka/
-  instance:
-    prefer-ip-address: true
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
-  endpoint:
-    health:
-      show-details: always
-
-logging:
-  level:
-    org.springframework.web: DEBUG
-    org.springframework.security: DEBUG
-    org.springframework.security.oauth2: DEBUG
 

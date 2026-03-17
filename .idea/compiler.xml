@@ -15,12 +15,13 @@
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
         </processorPath>
+        <module name="config-server" />
+        <module name="common-exception" />
+        <module name="gateway-service" />
         <module name="user-service" />
         <module name="bikestore" />
-        <module name="common-exception" />
         <module name="demo" />
         <module name="discovery-service" />
-        <module name="gateway-service" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
@@ -32,6 +33,7 @@
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="bikestore" options="-parameters" />
       <module name="common-exception" options="-parameters" />
+      <module name="config-server" options="-parameters" />
       <module name="demo" options="-parameters" />
       <module name="demo (1)" options="-parameters" />
       <module name="discovery-service" options="-parameters" />

@@ -1,35 +1,9 @@
-server:
-  port: 8082
-
+# Bootstrap config — only what's needed BEFORE connecting to config server
 spring:
   application:
-    name: inventory-service
+    name: inventory-service                          # tells config server which file to serve
+  config:
+    import: "configserver:http://config-server:8888" # where to fetch the rest of config
 
-  datasource:
-    url: jdbc:postgresql://localhost:5432/product_db
-    username: postgres
-    password: postgres
-
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-
-eureka:
-  client:
-    service-url:
-      defaultZone: http://discovery-service:8761/eureka/
-  instance:
-    prefer-ip-address: true
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
-  endpoint:
-    health:
-      show-details: always
+server:
+  port: 8082

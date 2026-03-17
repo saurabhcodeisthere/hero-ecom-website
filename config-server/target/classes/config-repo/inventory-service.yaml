@@ -1,0 +1,16 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# INVENTORY SERVICE CONFIG
+# ─────────────────────────────────────────────────────────────────────────────
+
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/bikestore
+    username: bikestore
+    password: bikestore
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true

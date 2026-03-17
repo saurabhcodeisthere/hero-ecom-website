@@ -12,7 +12,7 @@ public class GatewayConfig {
     public RouteLocator routeLocator(RouteLocatorBuilder builder) {
         return builder.routes()
                 .route("bike-service", r -> r
-                        .path("/api/bikes/**")
+                        .path("/api/v1/bikes/**", "/api/v1/admin/bikes/**")
                         .filters(GatewayFilterSpec::tokenRelay)
                         .uri("lb://bike-service"))        // lb:// = Eureka load-balanced lookup
 

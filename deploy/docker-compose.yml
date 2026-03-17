@@ -3,6 +3,10 @@ networks:
     driver: bridge
 
 services:
+
+  # ─────────────────────────────────────────────────────────────
+  # LAYER 1: Database — everything depends on this being healthy
+  # ─────────────────────────────────────────────────────────────
   postgres:
     image: postgres:14
     container_name: bike-postgres
@@ -23,76 +27,26 @@ services:
       timeout: 5s
       retries: 5
 
-  pgadmin: # pgAdmin UI container to visually manage postgres
+  pgadmin:
     image: dpage/pgadmin4
     container_name: pgadmin
     restart: unless-stopped
     depends_on:
       postgres:
-        condition: service_healthy # ensure db starts first AND is healthy before pgadmin boots
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com    # login email for pgadmin UI
-      PGADMIN_DEFAULT_PASSWORD: admin           # login password for pgadmin UI
-      PGADMIN_CONFIG_SERVER_MODE: "True"        # run pgadmin in normal multi-user server mode
-    ports:
-      - "5050:80"             # expose pgadmin web console -> port 5050 on host
-    networks:
-      - bikestore-network                # so pgadmin can reach "db" using hostname inside docker network
-
-
-  bike-service:
-    build: ../bike-service
-    container_name: bike-service
-    depends_on:
-      postgres:
         condition: service_healthy
-    ports:
-      - "8081:8081"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bikestore
-      SPRING_DATASOURCE_USERNAME: bikestore
-      SPRING_DATASOURCE_PASSWORD: bikestore
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "True"
+    ports:
+      - "5050:80"
     networks:
       - bikestore-network
-    restart: always
 
-  inventory-service:
-    build: ../inventory-service
-    container_name: inventory-service
-    depends_on:
-      postgres:
-        condition: service_healthy
-    ports:
-      - "8082:8082"
-    environment:
-      SPRING_APPLICATION_NAME: inventory-service
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bikestore
-      SPRING_DATASOURCE_USERNAME: bikestore
-      SPRING_DATASOURCE_PASSWORD: bikestore
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
-    networks:
-      - bikestore-network
-    restart: always
-
-  user-service:
-    build: ../user-service
-    container_name: user-service
-    depends_on:
-      postgres:
-        condition: service_healthy
-    ports:
-      - "8083:8083"
-    environment:
-      SPRING_APPLICATION_NAME: user-service
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/userdb
-      SPRING_DATASOURCE_USERNAME: bikestore
-      SPRING_DATASOURCE_PASSWORD: bikestore
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
-    networks:
-      - bikestore-network
-    restart: always
-
+  # ─────────────────────────────────────────────────────────────
+  # LAYER 2: Auth server + Service Registry
+  # Both depend only on postgres. They start in parallel.
+  # ─────────────────────────────────────────────────────────────
   keycloak:
     container_name: keycloak
     image: quay.io/keycloak/keycloak:26.4.6
@@ -108,27 +62,120 @@ services:
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloakdb
       KC_DB_USERNAME: bikestore
       KC_DB_PASSWORD: bikestore
-#      KC_HOSTNAME: local
-#      KC_HOSTNAME_PORT: 8080
-#      KC_HOSTNAME_STRICT: false
-    #      KC_HEALTH_ENABLED: "true"         # <--- REQUIRED to enable /health endpoints
-    #      KC_HTTP_ENABLED: "true"
-    command: [ "start-dev" ]
+    command: ["start-dev"]
     networks:
       - bikestore-network
+    restart: unless-stopped
 
+  discovery-service:
+    build: ../discovery-service
+    container_name: discovery-service
+    ports:
+      - "8761:8761"
+    networks:
+      - bikestore-network
+    restart: unless-stopped
+    healthcheck:
+      # Hits Eureka's actuator/health — only passes once Spring Boot is fully started
+      test: ["CMD-SHELL", "curl -f http://localhost:8761/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 60s   # Spring Boot takes ~30-60s to boot — don't count failures before that
+
+  # ─────────────────────────────────────────────────────────────
+  # LAYER 3: Microservices
+  # Wait for postgres (healthy) AND discovery-service (healthy)
+  # before starting — so they can register immediately on boot
+  # ─────────────────────────────────────────────────────────────
+  bike-service:
+    build: ../bike-service
+    container_name: bike-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bikestore
+      SPRING_DATASOURCE_USERNAME: bikestore
+      SPRING_DATASOURCE_PASSWORD: bikestore
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+    networks:
+      - bikestore-network
+    restart: unless-stopped
+
+  inventory-service:
+    build: ../inventory-service
+    container_name: inventory-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_APPLICATION_NAME: inventory-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bikestore
+      SPRING_DATASOURCE_USERNAME: bikestore
+      SPRING_DATASOURCE_PASSWORD: bikestore
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+    networks:
+      - bikestore-network
+    restart: unless-stopped
+
+  user-service:
+    build: ../user-service
+    container_name: user-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_APPLICATION_NAME: user-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/userdb
+      SPRING_DATASOURCE_USERNAME: bikestore
+      SPRING_DATASOURCE_PASSWORD: bikestore
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/hero-ecommerce
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+    networks:
+      - bikestore-network
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────────────────────
+  # LAYER 4: API Gateway — starts last
+  # Needs discovery-service healthy so lb:// routing works
+  # Needs services started so routes have targets available
+  # ─────────────────────────────────────────────────────────────
   gateway-service:
     build: ../gateway-service
     container_name: gateway-service
     depends_on:
-      - bike-service
-      - inventory-service
-      - user-service
+      discovery-service:
+        condition: service_healthy
+      bike-service:
+        condition: service_started
+      inventory-service:
+        condition: service_started
+      user-service:
+        condition: service_started
     ports:
       - "7070:7070"
+    environment:
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/hero-ecommerce
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
     networks:
       - bikestore-network
-    restart: always
+    restart: unless-stopped
 
 volumes:
   postgres_data:

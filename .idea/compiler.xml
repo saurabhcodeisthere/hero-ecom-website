@@ -8,30 +8,22 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
       </profile>
-      <profile name="Annotation profile for demo" enabled="true">
-        <sourceOutputDir name="target/generated-sources/annotations" />
-        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
-        <outputRelativeToContentRoot value="true" />
-        <processorPath useClasspath="false">
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
-        </processorPath>
-        <module name="demo" />
-      </profile>
-      <profile name="Annotation profile for Bikes" enabled="true">
+      <profile name="Annotation profile for Hero Ecom Platform" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
         </processorPath>
-        <module name="bikestore" />
-        <module name="gateway-service" />
         <module name="user-service" />
+        <module name="bikestore" />
+        <module name="common-exception" />
+        <module name="demo" />
+        <module name="discovery-service" />
+        <module name="gateway-service" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
-      <module name="common-exception" target="1.8" />
       <module name="demo (1)" target="17" />
       <module name="hero-ecom-website" target="1.5" />
     </bytecodeTargetLevel>
@@ -39,8 +31,10 @@
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="bikestore" options="-parameters" />
+      <module name="common-exception" options="-parameters" />
       <module name="demo" options="-parameters" />
       <module name="demo (1)" options="-parameters" />
+      <module name="discovery-service" options="-parameters" />
       <module name="gateway-service" options="-parameters" />
       <module name="user-service" options="-parameters" />
     </option>

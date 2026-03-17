@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        Spring Boot parent gives us:
+          - Managed versions for 500+ dependencies (no <version> needed for most things)
+          - Default compiler settings (UTF-8, Java source/target)
+          - Sane defaults for surefire, failsafe, jar plugin
+    -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.1</version>
+        <relativePath/>
+    </parent>
+
+    <!-- ───────────────────── Platform identity ───────────────────── -->
+    <groupId>com.hero</groupId>
+    <artifactId>hero-ecom-platform</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+    <name>Hero Ecom Platform</name>
+    <description>Parent POM for all Hero Ecommerce microservices</description>
+
+    <!-- ───────────────────── Child modules ───────────────────────── -->
+    <!--
+        Maven builds these in dependency order automatically.
+        common-exception is always built first because services depend on it.
+    -->
+    <modules>
+        <module>common-exception</module>
+        <module>discovery-service</module>
+        <module>user-service</module>
+        <module>inventory-service</module>
+        <module>bike-service</module>
+        <module>gateway-service</module>
+    </modules>
+
+    <!-- ───────────────────── Global versions ─────────────────────── -->
+    <properties>
+        <java.version>17</java.version>
+        <spring-cloud.version>2025.1.0</spring-cloud.version>
+        <common-exception.version>1.0.0</common-exception.version>
+    </properties>
+
+    <!-- ───────────────────── Version management ──────────────────── -->
+    <!--
+        dependencyManagement = "if a child uses this dependency, use THIS version".
+        It does NOT add the dependency to any child automatically.
+        Children still have to declare them, but WITHOUT a <version> tag.
+    -->
+    <dependencyManagement>
+        <dependencies>
+
+            <!-- Spring Cloud BOM — gives versions for gateway, loadbalancer, etc. -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Our shared exception library -->
+            <dependency>
+                <groupId>com.hero</groupId>
+                <artifactId>common-exception</artifactId>
+                <version>${common-exception.version}</version>
+            </dependency>
+
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- ───────────────────── Universal dependencies ──────────────── -->
+    <!--
+        dependencies = "add this to EVERY child module automatically".
+        Only put things that 100% of services need here.
+    -->
+    <dependencies>
+
+        <!-- Every service uses Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Every service needs tests -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <!-- ───────────────────── Plugin defaults ─────────────────────── -->
+    <build>
+        <!--
+            pluginManagement = "if a child uses this plugin, apply THESE settings".
+            Children can still override individual config values.
+        -->
+        <pluginManagement>
+            <plugins>
+
+                <!--
+                    Maven 3.9.x no longer auto-detects annotation processors.
+                    We must explicitly register Lombok here once for all services.
+                -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+
+                <!--
+                    Exclude Lombok from the final packaged JAR/executable.
+                    Lombok is compile-time only — no need to ship it at runtime.
+                -->
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <configuration>
+                        <excludes>
+                            <exclude>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                            </exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
+
+            </plugins>
+        </pluginManagement>
+    </build>
+
+</project>

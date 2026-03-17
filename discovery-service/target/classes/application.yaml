@@ -1,0 +1,24 @@
+server:
+  port: 8761   # Standard Eureka port — all clients look here by default
+
+spring:
+  application:
+    name: discovery-service
+
+eureka:
+  instance:
+    hostname: discovery-service   # Docker container hostname
+  client:
+    register-with-eureka: false   # This IS the registry — it doesn't register itself
+    fetch-registry: false         # No need to fetch — it holds the registry, not queries it
+    service-url:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

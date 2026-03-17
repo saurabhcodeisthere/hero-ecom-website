@@ -6,24 +6,25 @@
 
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- Use Spring Boot parent for dependency management — same as other services -->
     <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.1</version>
-        <relativePath/>
+        <groupId>com.hero</groupId>
+        <artifactId>hero-ecom-platform</artifactId>
+        <version>1.0.0</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <groupId>com.hero</groupId>
     <artifactId>common-exception</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
     <name>common-exception</name>
     <description>Shared exception handling library for Hero Ecom microservices</description>
 
+    <!--
+        lombok and spring-boot-starter-test are inherited from parent — no need to redeclare.
+    -->
     <dependencies>
 
-        <!-- Web — provides ResponseEntity, HttpStatus, @RestController etc -->
+        <!-- Web — provides ResponseEntity, HttpStatus, @RestControllerAdvice etc -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -35,28 +36,17 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
-        <!-- Lombok — for @Getter, @Builder on exception models -->
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <!-- Test -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-
     </dependencies>
 
     <build>
         <plugins>
             <plugin>
-                <!-- This is a LIBRARY — not an executable app.
-                     Skip repackage so Maven installs a plain JAR
-                     that other services can use as a dependency. -->
+                <!--
+                    This is a LIBRARY, not an executable app.
+                    Override the parent's spring-boot-maven-plugin config
+                    and add skip=true so Maven installs a plain JAR (not a fat JAR).
+                    Other services can then use it as a <dependency>.
+                -->
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>

@@ -3,6 +3,7 @@ package com.hero.bikestore.service.impl;
 import com.hero.bikestore.api.request.CreateInventoryRequest;
 import com.hero.bikestore.api.request.UpdateStockRequest;
 import com.hero.bikestore.api.response.InventoryResponse;
+import com.hero.bikestore.exception.InsufficientStockException;
 import com.hero.bikestore.exception.InventoryAlreadyExistsException;
 import com.hero.bikestore.exception.InventoryNotFoundException;
 import com.hero.bikestore.model.Inventory;
@@ -93,6 +94,42 @@ public class InventoryServiceImpl implements InventoryService {
         }
 
         return toResponse(inventory);
+    }
+
+    // -----------------------------------------------
+    // REDUCE STOCK — called by order-service (Feign)
+    // -----------------------------------------------
+    @Override
+    public InventoryResponse reduceStock(Long bikeId, Integer quantity) {
+        Inventory inventory = inventoryRepository.findByBikeId(bikeId)
+                .orElseThrow(() -> new InventoryNotFoundException(
+                        "Inventory not found for bikeId " + bikeId));
+
+        if (!inventory.isActive()) {
+            throw new InventoryNotFoundException("Inventory is inactive for bikeId " + bikeId);
+        }
+
+        if (inventory.getStockQuantity() < quantity) {
+            throw new InsufficientStockException(bikeId, inventory.getStockQuantity(), quantity);
+        }
+
+        // Hibernate @Version handles optimistic locking automatically —
+        // if two orders arrive at the same time, one will get OptimisticLockException
+        inventory.setStockQuantity(inventory.getStockQuantity() - quantity);
+        return toResponse(inventoryRepository.save(inventory));
+    }
+
+    // -----------------------------------------------
+    // RESTORE STOCK — called by order-service (Feign) on cancellation
+    // -----------------------------------------------
+    @Override
+    public InventoryResponse restoreStock(Long bikeId, Integer quantity) {
+        Inventory inventory = inventoryRepository.findByBikeId(bikeId)
+                .orElseThrow(() -> new InventoryNotFoundException(
+                        "Inventory not found for bikeId " + bikeId));
+
+        inventory.setStockQuantity(inventory.getStockQuantity() + quantity);
+        return toResponse(inventoryRepository.save(inventory));
     }
 
     // -------------------------

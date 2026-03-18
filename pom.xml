@@ -39,6 +39,7 @@
         <module>user-service</module>
         <module>inventory-service</module>
         <module>bike-service</module>
+        <module>order-service</module>
         <module>gateway-service</module>
     </modules>
 

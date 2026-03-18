@@ -38,4 +38,36 @@ public class InventoryController {
             @PathVariable Long bikeId) {
         return inventoryService.getByBikeId(bikeId);
     }
+
+    @Operation(
+            summary = "Reduce stock for a bike [Internal — called by order-service]",
+            description = "Decrements available stock by the given quantity. " +
+                          "Returns 400 if stock is insufficient. Uses optimistic locking for concurrent safety."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Stock reduced successfully"),
+            @ApiResponse(responseCode = "400", description = "Insufficient stock available", content = @Content),
+            @ApiResponse(responseCode = "404", description = "No inventory record for this bike", content = @Content)
+    })
+    @PatchMapping("/bike/{bikeId}/reduce")
+    public InventoryResponse reduceStock(
+            @Parameter(description = "Bike ID to reduce stock for", example = "1", required = true)
+            @PathVariable Long bikeId,
+            @Parameter(description = "Quantity to reduce", example = "2", required = true)
+            @RequestParam Integer quantity) {
+        return inventoryService.reduceStock(bikeId, quantity);
+    }
+
+    @Operation(
+            summary = "Restore stock for a bike [Internal — called by order-service on cancellation]",
+            description = "Increments available stock by the given quantity. Called when an order is cancelled."
+    )
+    @PatchMapping("/bike/{bikeId}/restore")
+    public InventoryResponse restoreStock(
+            @Parameter(description = "Bike ID to restore stock for", example = "1", required = true)
+            @PathVariable Long bikeId,
+            @Parameter(description = "Quantity to restore", example = "2", required = true)
+            @RequestParam Integer quantity) {
+        return inventoryService.restoreStock(bikeId, quantity);
+    }
 }

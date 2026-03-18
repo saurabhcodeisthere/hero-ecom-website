@@ -1,0 +1,67 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ORDER SERVICE CONFIG
+# ─────────────────────────────────────────────────────────────────────────────
+
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/orderdb
+    username: bikestore
+    password: bikestore
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  # Keycloak JWT validation
+  # Using jwk-set-uri instead of issuer-uri because:
+  # Token iss claim = http://localhost:9090 (external URL used to obtain the token)
+  # Service runs inside Docker where Keycloak = http://keycloak:8080
+  # These two URLs differ, causing issuer-uri validation to fail with 401.
+  # jwk-set-uri fetches the public key directly — validates signature without checking iss URL.
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://keycloak:8080/realms/hero-ecommerce/protocol/openid-connect/certs
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RESILIENCE4J — Circuit Breaker + Retry
+# ─────────────────────────────────────────────────────────────────────────────
+resilience4j:
+  circuitbreaker:
+    instances:
+      order-placement:
+        # After 5 calls in the sliding window, evaluate failure rate
+        sliding-window-size: 5
+        # Open the circuit if 50% or more calls fail
+        failure-rate-threshold: 50
+        # Stay open for 20 seconds before allowing a test call through
+        wait-duration-in-open-state: 20s
+        # Allow 2 test calls when half-open
+        permitted-number-of-calls-in-half-open-state: 2
+        # RestClientException is the base class for all Spring RestClient errors.
+        # This covers: connection refused, read timeout, 5xx server errors.
+        record-exceptions:
+          - org.springframework.web.client.RestClientException
+        # Business exceptions — NOT counted as failures, NOT intercepted by fallback.
+        # HttpClientErrorException covers all 4xx responses from downstream services.
+        # BikeNotFoundException (404) and InsufficientStockException (400) must reach
+        # the client with the correct HTTP status instead of being swallowed into 503.
+        ignore-exceptions:
+          - com.hero.bikestore.exception.BikeNotFoundException
+          - com.hero.bikestore.exception.InsufficientStockException
+
+  retry:
+    instances:
+      order-placement:
+        # Try 3 times total (1 initial + 2 retries)
+        max-attempts: 3
+        # Wait 500ms between attempts
+        wait-duration: 500ms
+        # ResourceAccessException = I/O failure (connection refused, read timeout).
+        # Only these are worth retrying — a 404 or 400 will never succeed on retry.
+        retry-exceptions:
+          - org.springframework.web.client.ResourceAccessException

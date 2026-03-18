@@ -1,0 +1,10 @@
+# Bootstrap config — only what's needed BEFORE connecting to config server
+# Everything else (datasource, jpa, security, eureka) lives in config-server/config-repo/order-service.yaml
+spring:
+  application:
+    name: order-service
+  config:
+    import: "configserver:http://config-server:8888"
+
+server:
+  port: 8084

@@ -11,4 +11,10 @@ public interface InventoryService {
     InventoryResponse updateStock(Long inventoryId, UpdateStockRequest request);
 
     InventoryResponse getByBikeId(Long bikeId);
+
+    // Called by order-service via Feign when a new order is placed
+    InventoryResponse reduceStock(Long bikeId, Integer quantity);
+
+    // Called by order-service via Feign when an order is cancelled
+    InventoryResponse restoreStock(Long bikeId, Integer quantity);
 }

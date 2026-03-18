@@ -25,6 +25,11 @@ public class GatewayConfig {
                         .path("/api/v1/users/**", "/api/v1/admin/users/**")
                         .filters(GatewayFilterSpec::tokenRelay)
                         .uri("lb://user-service"))        // no hardcoded port — Eureka handles it
+
+                .route("order-service", r -> r
+                        .path("/api/v1/orders/**", "/api/v1/admin/orders/**")
+                        .filters(GatewayFilterSpec::tokenRelay)
+                        .uri("lb://order-service"))       // resolves via Eureka registry
                 .build();
     }
 }

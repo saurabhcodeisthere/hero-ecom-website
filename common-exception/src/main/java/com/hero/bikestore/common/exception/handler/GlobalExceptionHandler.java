@@ -52,11 +52,12 @@ public class GlobalExceptionHandler {
 
     private HttpStatus mapStatus(BaseException ex) {
         return switch (ex.getErrorCode()) {
-            case "RESOURCE_NOT_FOUND" -> HttpStatus.NOT_FOUND;
-            case "BAD_REQUEST"        -> HttpStatus.BAD_REQUEST;
-            case "CONFLICT"           -> HttpStatus.CONFLICT;
-            case "FORBIDDEN"          -> HttpStatus.FORBIDDEN;
-            default                   -> HttpStatus.INTERNAL_SERVER_ERROR;
+            case "RESOURCE_NOT_FOUND"    -> HttpStatus.NOT_FOUND;
+            case "BAD_REQUEST"           -> HttpStatus.BAD_REQUEST;
+            case "CONFLICT"              -> HttpStatus.CONFLICT;
+            case "FORBIDDEN"             -> HttpStatus.FORBIDDEN;
+            case "SERVICE_UNAVAILABLE"   -> HttpStatus.SERVICE_UNAVAILABLE;
+            default                      -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
     }
 }

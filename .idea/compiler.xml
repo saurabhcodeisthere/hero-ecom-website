@@ -18,6 +18,7 @@
         <module name="config-server" />
         <module name="common-exception" />
         <module name="gateway-service" />
+        <module name="order-service" />
         <module name="user-service" />
         <module name="bikestore" />
         <module name="demo" />
@@ -38,6 +39,7 @@
       <module name="demo (1)" options="-parameters" />
       <module name="discovery-service" options="-parameters" />
       <module name="gateway-service" options="-parameters" />
+      <module name="order-service" options="-parameters" />
       <module name="user-service" options="-parameters" />
     </option>
   </component>

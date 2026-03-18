@@ -1,0 +1,298 @@
+/* ============================================================
+   Hero Bikestore — Login Theme v4
+   CSS loads via template.ftl <link> injection (not theme.properties styles=)
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ── Variables ────────────────────────────────────────────── */
+:root {
+  --hb-bg:           #050508;
+  --hb-bg-card:      #0f0f13;
+  --hb-bg-input:     #18181f;
+  --hb-border:       rgba(255,255,255,0.09);
+  --hb-border-hover: rgba(255,255,255,0.20);
+  --hb-text:         #f0f0f5;
+  --hb-muted:        #6b6b7a;
+  --hb-label:        #9090a8;
+  --hb-pink:         #e11d48;
+  --hb-purple:       #7c3aed;
+  --hb-radius-card:  18px;
+  --hb-radius-input: 10px;
+  --hb-radius-btn:   10px;
+  --hb-ease:         cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Font ─────────────────────────────────────────────────── */
+html, body, * {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  box-sizing: border-box;
+}
+
+/* ── Page background ──────────────────────────────────────── */
+body#keycloak-bg {
+  background-color: var(--hb-bg) !important;
+  background-image:
+    radial-gradient(ellipse 55% 40% at 15% 15%, rgba(225,29,72,0.07) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 40% at 85% 85%, rgba(124,58,237,0.07) 0%, transparent 65%) !important;
+  min-height: 100vh;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* ── Outer login wrapper — full viewport, transparent ──────── */
+.pf-v5-c-login {
+  background: transparent !important;
+  width: 100% !important;
+  min-height: 100vh !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 24px !important;
+}
+
+/* ── Inner container — fixes the fixed-1200px-width issue ─── */
+.pf-v5-c-login__container {
+  width: 100% !important;
+  max-width: 480px !important;       /* narrow: only need the login card */
+  padding-left: 0 !important;        /* remove the huge 98px padding     */
+  padding-right: 0 !important;
+}
+
+/* ── Header above card (realm name "hero-ecommerce") ────────── */
+#kc-header {
+  background: transparent !important;
+  margin-bottom: 28px !important;
+  text-align: center !important;
+}
+
+#kc-header-wrapper {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  text-align: center !important;
+
+  /* Gradient text */
+  font-size: 26px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+  text-transform: none !important;
+  background: linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.55) 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+
+  /* Subtle glow behind the text */
+  filter: drop-shadow(0 0 18px rgba(225,29,72,0.25)) drop-shadow(0 0 32px rgba(124,58,237,0.18)) !important;
+}
+
+/* Dot separator between "hero" and "ecommerce" — purely decorative */
+#kc-header-wrapper::before {
+  content: '⬡';
+  font-size: 10px !important;
+  background: linear-gradient(135deg, var(--hb-pink), var(--hb-purple)) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  filter: none !important;
+  opacity: 0.9;
+  flex-shrink: 0;
+}
+
+#kc-header-wrapper::after {
+  content: '⬡';
+  font-size: 10px !important;
+  background: linear-gradient(135deg, var(--hb-purple), var(--hb-pink)) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  filter: none !important;
+  opacity: 0.9;
+  flex-shrink: 0;
+}
+
+/* ── Card ─────────────────────────────────────────────────── */
+.pf-v5-c-login__main {
+  background: var(--hb-bg-card) !important;
+  border: 1px solid var(--hb-border) !important;
+  border-radius: var(--hb-radius-card) !important;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.03),
+    0 8px 24px rgba(0,0,0,0.45),
+    0 32px 80px rgba(0,0,0,0.55) !important;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Gradient top stripe */
+.pf-v5-c-login__main::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--hb-pink), var(--hb-purple));
+  border-radius: var(--hb-radius-card) var(--hb-radius-card) 0 0;
+  z-index: 1;
+}
+
+/* ── Card header ──────────────────────────────────────────── */
+.pf-v5-c-login__main-header {
+  background: transparent !important;
+  border-bottom: 1px solid var(--hb-border) !important;
+  padding: 28px 28px 20px 28px !important;
+}
+
+.pf-v5-c-login__main-header .pf-v5-c-title,
+#kc-page-title {
+  color: var(--hb-text) !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.025em !important;
+}
+
+/* ── Card body ────────────────────────────────────────────── */
+.pf-v5-c-login__main-body {
+  background: transparent !important;
+  padding: 24px 28px !important;
+}
+
+/* ── Card footer ──────────────────────────────────────────── */
+.pf-v5-c-login__main-footer {
+  background: rgba(0,0,0,0.2) !important;
+  border-top: 1px solid var(--hb-border) !important;
+  padding: 16px 28px !important;
+}
+
+.pf-v5-c-login__main-footer-links-item > a,
+.pf-v5-c-login__main-footer-band-item > a {
+  color: var(--hb-muted) !important;
+  font-size: 13px !important;
+}
+.pf-v5-c-login__main-footer-links-item > a:hover,
+.pf-v5-c-login__main-footer-band-item > a:hover {
+  color: var(--hb-text) !important;
+  text-decoration: none !important;
+}
+
+/* ── Labels ───────────────────────────────────────────────── */
+.pf-v5-c-form__label-text {
+  color: var(--hb-label) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+}
+
+/* ── Input wrapper — NO border (prevents double box) ─────── */
+.pf-v5-c-form-control {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  outline: none !important;
+}
+
+/* ── The actual <input> ───────────────────────────────────── */
+.pf-v5-c-form-control input,
+.pf-v5-c-form-control input[type="text"],
+.pf-v5-c-form-control input[type="password"],
+.pf-v5-c-form-control input[type="email"] {
+  width: 100% !important;
+  height: 44px !important;
+  padding: 0 14px !important;
+  background: var(--hb-bg-input) !important;
+  border: 1px solid var(--hb-border) !important;
+  border-radius: var(--hb-radius-input) !important;
+  color: var(--hb-text) !important;
+  font-size: 14px !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition: border-color 140ms var(--hb-ease), box-shadow 140ms var(--hb-ease) !important;
+}
+
+.pf-v5-c-form-control input:hover {
+  border-color: var(--hb-border-hover) !important;
+}
+
+.pf-v5-c-form-control input:focus {
+  border-color: transparent !important;
+  box-shadow:
+    0 0 0 2px var(--hb-bg-input),
+    0 0 0 4px rgba(225,29,72,0.45),
+    0 0 0 4px rgba(124,58,237,0.30) !important;
+}
+
+input::placeholder { color: rgba(255,255,255,0.18) !important; }
+
+/* ── Password eye toggle ──────────────────────────────────── */
+.pf-v5-c-form-control__utilities button,
+.pf-v5-c-button.pf-m-plain {
+  background: transparent !important;
+  color: var(--hb-muted) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.pf-v5-c-button.pf-m-plain:hover { color: var(--hb-text) !important; }
+
+/* ── Checkbox ─────────────────────────────────────────────── */
+.pf-v5-c-check__input { accent-color: var(--hb-pink) !important; }
+.pf-v5-c-check__label {
+  color: var(--hb-muted) !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+}
+
+/* "Forgot password?" — gradient text */
+#kc-form-options a {
+  background: linear-gradient(90deg, var(--hb-pink), var(--hb-purple)) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+/* ── Primary button ───────────────────────────────────────── */
+#kc-login,
+.pf-v5-c-button.pf-m-primary {
+  width: 100% !important;
+  height: 44px !important;
+  border: none !important;
+  border-radius: var(--hb-radius-btn) !important;
+  background: linear-gradient(135deg, var(--hb-pink) 0%, var(--hb-purple) 100%) !important;
+  color: #ffffff !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(225,29,72,0.28), 0 4px 18px rgba(124,58,237,0.18) !important;
+  transition: opacity 140ms var(--hb-ease), transform 100ms var(--hb-ease) !important;
+}
+#kc-login:hover, .pf-v5-c-button.pf-m-primary:hover { opacity: 0.9 !important; }
+#kc-login:active, .pf-v5-c-button.pf-m-primary:active { transform: scale(0.985) !important; }
+
+/* ── Alert boxes ──────────────────────────────────────────── */
+.pf-v5-c-alert {
+  background: rgba(225,29,72,0.07) !important;
+  border: 1px solid rgba(225,29,72,0.22) !important;
+  border-radius: 10px !important;
+}
+.pf-v5-c-alert__title, .pf-v5-c-alert__description, .pf-v5-c-alert__icon {
+  color: #f87171 !important;
+}
+.pf-v5-c-alert.pf-m-success {
+  background: rgba(74,222,128,0.07) !important;
+  border-color: rgba(74,222,128,0.22) !important;
+}
+.pf-v5-c-alert.pf-m-success .pf-v5-c-alert__title,
+.pf-v5-c-alert.pf-m-success .pf-v5-c-alert__icon { color: #4ade80 !important; }
+
+/* ── Scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--hb-bg); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.09); border-radius: 3px; }

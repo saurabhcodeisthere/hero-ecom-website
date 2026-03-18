@@ -62,6 +62,9 @@ services:
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloakdb
       KC_DB_USERNAME: bikestore
       KC_DB_PASSWORD: bikestore
+    volumes:
+      # Mount our custom theme so Keycloak can find it at startup
+      - ./keycloak-themes/hero-theme:/opt/keycloak/themes/hero-theme
     command: ["start-dev"]
     networks:
       - bikestore-network

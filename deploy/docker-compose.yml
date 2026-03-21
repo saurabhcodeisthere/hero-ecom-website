@@ -170,6 +170,20 @@ services:
       - bikestore-network
     restart: unless-stopped
 
+  notification-service:
+    build: ../notification-service
+    container_name: notification-service
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    # No DB dependency — notification-service has no database
+    # No ports exposed — internal service called only by order-service via Eureka
+    networks:
+      - bikestore-network
+    restart: unless-stopped
+
   # ─────────────────────────────────────────────────────────────
   # LAYER 4: API Gateway — starts last
   # ─────────────────────────────────────────────────────────────

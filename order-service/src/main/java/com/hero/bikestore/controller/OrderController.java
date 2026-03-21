@@ -7,9 +7,12 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -21,12 +24,13 @@ public class OrderController {
     /**
      * POST /api/v1/orders
      *
-     * Places a new order for the authenticated user.
+     * Places a new order for the authenticated customer.
      * userId is extracted from the JWT — never passed in the request body.
      *
      * Returns 201 Created with the full order details.
      */
     @PostMapping
+    @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<OrderResponse> placeOrder(
             @Valid @RequestBody PlaceOrderRequest request,
             @AuthenticationPrincipal Jwt jwt) {
@@ -37,20 +41,56 @@ public class OrderController {
     }
 
     /**
+     * GET /api/v1/orders
+     *
+     * Returns all orders placed by the authenticated customer, newest first.
+     * Each customer only sees their own orders.
+     *
+     * Returns 200 OK with a list (empty list if no orders yet).
+     */
+    @GetMapping
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<List<OrderResponse>> getMyOrders(
+            @AuthenticationPrincipal Jwt jwt) {
+
+        return ResponseEntity.ok(orderService.getMyOrders(jwt));
+    }
+
+    /**
      * GET /api/v1/orders/{id}
      *
-     * Retrieves a single order by its database ID.
+     * Returns a single order by its database ID.
      * A customer can only fetch their own orders — 403 if the order belongs to someone else.
      *
-     * Returns 200 OK with full order details including all items.
-     * Returns 404 if the order does not exist.
-     * Returns 403 if the order belongs to a different user.
+     * Returns 200 OK, 404 if not found, 403 if not owner.
      */
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<OrderResponse> getOrderById(
             @PathVariable Long id,
             @AuthenticationPrincipal Jwt jwt) {
 
         return ResponseEntity.ok(orderService.getOrderById(id, jwt));
+    }
+
+    /**
+     * DELETE /api/v1/orders/{id}
+     *
+     * Cancels a PENDING order placed by the authenticated customer.
+     * Stock is automatically restored in inventory-service.
+     *
+     * Returns 204 No Content on success.
+     * Returns 400 if order is not in PENDING status.
+     * Returns 403 if the order belongs to someone else.
+     * Returns 404 if the order does not exist.
+     */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<Void> cancelMyOrder(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        orderService.cancelMyOrder(id, jwt);
+        return ResponseEntity.noContent().build();
     }
 }

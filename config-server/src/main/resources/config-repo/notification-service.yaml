@@ -1,0 +1,37 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# NOTIFICATION SERVICE CONFIG
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAILTRAP SMTP — fake inbox for development email testing
+#
+# HOW TO GET YOUR CREDENTIALS:
+#   1. Go to https://mailtrap.io and sign up (free)
+#   2. Go to Email Testing → Inboxes → your inbox → SMTP Settings
+#   3. Select "Spring Boot" from the integration dropdown
+#   4. Copy username and password below
+#
+# WHY MAILTRAP?
+#   Emails sent here never reach real inboxes.
+#   You see them in the Mailtrap dashboard only.
+#   Safe to test without spamming real users.
+# ─────────────────────────────────────────────────────────────────────────────
+spring:
+  mail:
+    host: sandbox.smtp.mailtrap.io
+    port: 2525
+    username: YOUR_MAILTRAP_USERNAME      # ← replace with your Mailtrap username
+    password: YOUR_MAILTRAP_PASSWORD      # ← replace with your Mailtrap password
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# APP SETTINGS
+# ─────────────────────────────────────────────────────────────────────────────
+app:
+  mail:
+    from: noreply@hero-bikestore.com   # sender address shown in emails

@@ -1,0 +1,10 @@
+# Bootstrap config — only what's needed BEFORE connecting to config server
+# Everything else (mail, eureka) lives in config-server/config-repo/notification-service.yaml
+spring:
+  application:
+    name: notification-service
+  config:
+    import: "configserver:http://config-server:8888"
+
+server:
+  port: 8085

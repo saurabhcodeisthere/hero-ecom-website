@@ -40,6 +40,7 @@
         <module>inventory-service</module>
         <module>bike-service</module>
         <module>order-service</module>
+        <module>notification-service</module>
         <module>gateway-service</module>
     </modules>
 

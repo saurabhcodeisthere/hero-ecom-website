@@ -4,6 +4,7 @@ import com.hero.bikestore.common.exception.base.BaseException;
 import com.hero.bikestore.common.exception.model.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -36,6 +37,25 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
+                .body(response);
+    }
+
+    /**
+     * @PreAuthorize("hasRole('CUSTOMER')") throws AccessDeniedException when
+     * the authenticated user does not have the required role.
+     *
+     * This is different from 401 (not authenticated) — the user IS logged in,
+     * they just don't have permission. That is a 403 Forbidden.
+     *
+     * Without this handler, AccessDeniedException falls through to handleUnknown()
+     * and returns 500 — which is wrong and confusing.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
+        ErrorResponse response =
+                new ErrorResponse("You do not have permission to perform this action", "FORBIDDEN");
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
                 .body(response);
     }
 

@@ -2,10 +2,12 @@ package com.hero.bikestore.config;
 
 import com.hero.bikestore.client.BikeServiceClient;
 import com.hero.bikestore.client.InventoryServiceClient;
+import com.hero.bikestore.client.NotificationServiceClient;
 import org.springframework.cloud.client.loadbalancer.LoadBalancerClient;
 import org.springframework.cloud.client.loadbalancer.LoadBalancerInterceptor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.support.RestClientAdapter;
 import org.springframework.web.service.invoker.HttpServiceProxyFactory;
@@ -36,6 +38,7 @@ import org.springframework.web.service.invoker.HttpServiceProxyFactory;
  *   5. Request proceeds — this happens on EVERY call, so instance changes are picked up automatically
  */
 @Configuration
+@EnableAsync
 public class HttpClientConfig {
 
     /**
@@ -73,5 +76,25 @@ public class HttpClientConfig {
                 .builderFor(RestClientAdapter.create(restClient))
                 .build()
                 .createClient(InventoryServiceClient.class);
+    }
+
+    /**
+     * HTTP interface proxy for notification-service.
+     *
+     * Called only from NotificationAsyncSender (@Async) — the HTTP call
+     * itself is synchronous but the calling thread is a background thread,
+     * so order-service's main request thread is never blocked.
+     */
+    @Bean
+    public NotificationServiceClient notificationServiceClient(LoadBalancerClient loadBalancerClient) {
+        RestClient restClient = RestClient.builder()
+                .baseUrl("http://notification-service")
+                .requestInterceptor(new LoadBalancerInterceptor(loadBalancerClient))
+                .build();
+
+        return HttpServiceProxyFactory
+                .builderFor(RestClientAdapter.create(restClient))
+                .build()
+                .createClient(NotificationServiceClient.class);
     }
 }

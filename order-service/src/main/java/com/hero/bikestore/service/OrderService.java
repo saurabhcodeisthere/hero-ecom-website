@@ -5,14 +5,19 @@ import com.hero.bikestore.client.InventoryServiceClient;
 import com.hero.bikestore.client.response.BikeClientResponse;
 import com.hero.bikestore.client.response.InventoryClientResponse;
 import com.hero.bikestore.common.exception.base.ForbiddenException;
+import com.hero.bikestore.dto.event.OrderNotificationEvent;
 import com.hero.bikestore.dto.request.OrderItemRequest;
 import com.hero.bikestore.dto.request.PlaceOrderRequest;
+import com.hero.bikestore.dto.response.AdminOrderResponse;
 import com.hero.bikestore.dto.response.OrderResponse;
+import com.hero.bikestore.dto.response.PagedOrderResponse;
 import com.hero.bikestore.entity.Order;
 import com.hero.bikestore.entity.OrderItem;
 import com.hero.bikestore.entity.OrderStatus;
+import com.hero.bikestore.enums.OrderEventType;
 import com.hero.bikestore.exception.BikeNotFoundException;
 import com.hero.bikestore.exception.InsufficientStockException;
+import com.hero.bikestore.exception.InvalidOrderStateException;
 import com.hero.bikestore.exception.OrderNotFoundException;
 import com.hero.bikestore.exception.ServiceUnavailableException;
 import com.hero.bikestore.mapper.OrderMapper;
@@ -21,6 +26,9 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,7 +36,9 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -40,6 +50,11 @@ public class OrderService {
     private final OrderMapper orderMapper;
     private final BikeServiceClient bikeServiceClient;
     private final InventoryServiceClient inventoryServiceClient;
+    private final NotificationAsyncSender notificationAsyncSender;
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // CUSTOMER OPERATIONS
+    // ═════════════════════════════════════════════════════════════════════════
 
     /**
      * Places a new order.
@@ -73,10 +88,10 @@ public class OrderService {
 
         for (OrderItemRequest itemRequest : request.getItems()) {
 
-            // ── Step 1: Validate bike exists, get name + price ───────────────
+            // Step 1: Validate bike exists, get name + price
             BikeClientResponse bike = fetchBike(itemRequest.getBikeId());
 
-            // ── Step 2: Validate stock is sufficient ─────────────────────────
+            // Step 2: Validate stock is sufficient
             InventoryClientResponse inventory = fetchInventory(itemRequest.getBikeId());
 
             if (inventory.getStockQuantity() < itemRequest.getQuantity()) {
@@ -87,10 +102,10 @@ public class OrderService {
                 );
             }
 
-            // ── Step 3: Reduce stock atomically in inventory-service ──────────
+            // Step 3: Reduce stock atomically in inventory-service
             inventoryServiceClient.reduceStock(itemRequest.getBikeId(), itemRequest.getQuantity());
 
-            // ── Step 4: Build order item — price is a snapshot, not a reference
+            // Step 4: Build order item — price is a snapshot, not a reference
             BigDecimal price = bike.getPrice();
             BigDecimal subtotal = price.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
 
@@ -114,6 +129,8 @@ public class OrderService {
         Order saved = orderRepository.save(order);
         log.info("Order placed: orderNumber={}, total={}", saved.getOrderNumber(), saved.getTotalAmount());
 
+        notify(saved, OrderEventType.ORDER_PLACED);
+
         return orderMapper.toResponse(saved);
     }
 
@@ -121,29 +138,31 @@ public class OrderService {
      * Circuit breaker fallback — called whenever placeOrder throws.
      * Signature must match placeOrder + Throwable at the end.
      *
-     * IMPORTANT: @CircuitBreaker's fallbackMethod is invoked for ALL exceptions,
-     * including business exceptions like BikeNotFoundException (404) and
-     * InsufficientStockException (400). We re-throw those so they reach the
-     * client with the correct HTTP status instead of being swallowed into a 503.
-     *
-     * Only connectivity exceptions (RestClientException, timeout, etc.) should
-     * result in 503 SERVICE_UNAVAILABLE.
+     * Re-throws business exceptions (4xx) so they reach the client correctly.
+     * Only connectivity failures (RestClientException) become 503.
      */
     public OrderResponse placeOrderFallback(PlaceOrderRequest request, Jwt jwt, Throwable t) {
-        // Re-throw business exceptions — these are valid client errors (4xx), not circuit breaker events
-        if (t instanceof BikeNotFoundException) {
-            throw (BikeNotFoundException) t;
-        }
-        if (t instanceof InsufficientStockException) {
-            throw (InsufficientStockException) t;
-        }
+        if (t instanceof BikeNotFoundException) throw (BikeNotFoundException) t;
+        if (t instanceof InsufficientStockException) throw (InsufficientStockException) t;
         log.error("Circuit breaker triggered during placeOrder: {}", t.getMessage());
         throw new ServiceUnavailableException("Order placement service");
     }
 
     /**
-     * Fetches a single order by ID.
-     * Ownership check: customer can only view their own orders.
+     * Returns all orders placed by the authenticated customer, newest first.
+     */
+    @Transactional(readOnly = true)
+    public List<OrderResponse> getMyOrders(Jwt jwt) {
+        String userId = jwt.getSubject();
+        return orderRepository.findByUserIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .map(orderMapper::toResponse)
+                .toList();
+    }
+
+    /**
+     * Returns a single order by ID.
+     * Ownership check: customers can only view their own orders.
      */
     @Transactional(readOnly = true)
     public OrderResponse getOrderById(Long id, Jwt jwt) {
@@ -160,37 +179,222 @@ public class OrderService {
         return orderMapper.toResponse(order);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Private helpers — wrap RestClient calls with proper exception translation
-    //
-    // RestClient exception hierarchy:
-    //   RestClientException (base)
-    //   ├── HttpClientErrorException   → 4xx from the downstream service
-    //   │   ├── NotFound               → 404 specifically
-    //   │   ├── BadRequest             → 400
-    //   │   └── ...
-    //   ├── HttpServerErrorException   → 5xx from the downstream service
-    //   └── ResourceAccessException    → I/O failure (connection refused, timeout)
-    // ─────────────────────────────────────────────────────────────────────────
+    /**
+     * Cancels a customer's own order.
+     *
+     * Rules:
+     *   - Customer can only cancel their own orders
+     *   - Only PENDING orders can be cancelled by the customer
+     *   - Stock is restored for every item in the order
+     */
+    @Transactional
+    public void cancelMyOrder(Long id, Jwt jwt) {
+        String userId = jwt.getSubject();
 
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new OrderNotFoundException(id));
+
+        if (!order.getUserId().equals(userId)) {
+            throw new ForbiddenException("You are not authorized to cancel this order");
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new InvalidOrderStateException(
+                    "Only PENDING orders can be cancelled by the customer. " +
+                    "Current status: " + order.getStatus() +
+                    ". Please contact support to cancel orders that are already confirmed or shipped."
+            );
+        }
+
+        restoreStockForOrder(order);
+        order.setStatus(OrderStatus.CANCELLED);
+        Order saved = orderRepository.save(order);
+
+        log.info("Order {} cancelled by customer userId={}", order.getOrderNumber(), userId);
+
+        notify(saved, OrderEventType.ORDER_CANCELLED);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // ADMIN OPERATIONS
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Returns all orders with pagination. Admin use only.
+     *
+     * If status is provided, filters by that status.
+     * If status is null, returns all orders regardless of status.
+     */
+    @Transactional(readOnly = true)
+    public PagedOrderResponse getAllOrders(int page, int size, OrderStatus status) {
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<Order> orderPage = (status != null)
+                ? orderRepository.findByStatusOrderByCreatedAtDesc(status, pageable)
+                : orderRepository.findAllByOrderByCreatedAtDesc(pageable);
+
+        List<AdminOrderResponse> orders = orderPage.getContent()
+                .stream()
+                .map(orderMapper::toAdminResponse)
+                .toList();
+
+        return PagedOrderResponse.builder()
+                .orders(orders)
+                .page(orderPage.getNumber())
+                .size(orderPage.getSize())
+                .totalElements(orderPage.getTotalElements())
+                .totalPages(orderPage.getTotalPages())
+                .last(orderPage.isLast())
+                .build();
+    }
+
+    /**
+     * Returns any single order by ID. Admin use only — no ownership check.
+     */
+    @Transactional(readOnly = true)
+    public AdminOrderResponse getAdminOrderById(Long id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new OrderNotFoundException(id));
+        return orderMapper.toAdminResponse(order);
+    }
+
+    /**
+     * PENDING → CONFIRMED
+     * Admin confirms the order after verifying payment and availability.
+     */
+    @Transactional
+    public AdminOrderResponse confirmOrder(Long id) {
+        return transitionStatus(id, OrderStatus.PENDING, OrderStatus.CONFIRMED, "confirm");
+    }
+
+    /**
+     * CONFIRMED → SHIPPED
+     * Admin marks the order as dispatched.
+     */
+    @Transactional
+    public AdminOrderResponse shipOrder(Long id) {
+        return transitionStatus(id, OrderStatus.CONFIRMED, OrderStatus.SHIPPED, "ship");
+    }
+
+    /**
+     * SHIPPED → DELIVERED
+     * Admin marks the order as delivered to the customer.
+     */
+    @Transactional
+    public AdminOrderResponse deliverOrder(Long id) {
+        return transitionStatus(id, OrderStatus.SHIPPED, OrderStatus.DELIVERED, "deliver");
+    }
+
+    /**
+     * Admin cancels an order. Allowed from PENDING or CONFIRMED state only.
+     * Stock is always restored on cancellation.
+     *
+     * SHIPPED and DELIVERED orders cannot be cancelled — requires a separate
+     * return/refund flow (future feature).
+     */
+    @Transactional
+    public void adminCancelOrder(Long id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new OrderNotFoundException(id));
+
+        if (order.getStatus() == OrderStatus.SHIPPED ||
+            order.getStatus() == OrderStatus.DELIVERED ||
+            order.getStatus() == OrderStatus.CANCELLED) {
+            throw new InvalidOrderStateException(
+                    "Cannot cancel an order with status: " + order.getStatus() + ". " +
+                    "Only PENDING and CONFIRMED orders can be cancelled."
+            );
+        }
+
+        restoreStockForOrder(order);
+        order.setStatus(OrderStatus.CANCELLED);
+        Order saved = orderRepository.save(order);
+
+        log.info("Order {} cancelled by admin", order.getOrderNumber());
+
+        notify(saved, OrderEventType.ORDER_CANCELLED);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // PRIVATE HELPERS
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Generic status transition — validates current status before updating.
+     *
+     * Prevents invalid transitions like PENDING → DELIVERED in one step,
+     * or trying to ship an already CANCELLED order.
+     */
+    private AdminOrderResponse transitionStatus(Long id, OrderStatus from, OrderStatus to, String action) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new OrderNotFoundException(id));
+
+        if (order.getStatus() != from) {
+            throw new InvalidOrderStateException(
+                    "Cannot " + action + " an order with status: " + order.getStatus() +
+                    ". Required status: " + from
+            );
+        }
+
+        order.setStatus(to);
+        Order saved = orderRepository.save(order);
+
+        log.info("Order {} transitioned: {} → {}", saved.getOrderNumber(), from, to);
+
+        // Map the new status to its notification event type
+        OrderEventType eventType = switch (to) {
+            case CONFIRMED -> OrderEventType.ORDER_CONFIRMED;
+            case SHIPPED   -> OrderEventType.ORDER_SHIPPED;
+            case DELIVERED -> OrderEventType.ORDER_DELIVERED;
+            default        -> null;
+        };
+        if (eventType != null) {
+            notify(saved, eventType);
+        }
+
+        return orderMapper.toAdminResponse(saved);
+    }
+
+    /**
+     * Restores inventory stock for every item in the order.
+     * Called whenever an order is cancelled (by customer or admin).
+     *
+     * Best-effort: if a stock restore call fails, it logs the error and
+     * continues — the cancellation still succeeds.
+     */
+    private void restoreStockForOrder(Order order) {
+        for (OrderItem item : order.getItems()) {
+            try {
+                inventoryServiceClient.restoreStock(item.getBikeId(), item.getQuantity());
+                log.info("Stock restored for bikeId={}, quantity={}", item.getBikeId(), item.getQuantity());
+            } catch (RestClientException e) {
+                log.error("Failed to restore stock for bikeId={} on order {}: {}",
+                        item.getBikeId(), order.getOrderNumber(), e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Wraps bike-service HTTP call with proper exception translation.
+     */
     private BikeClientResponse fetchBike(Long bikeId) {
         try {
             return bikeServiceClient.getBikeById(bikeId);
         } catch (HttpClientErrorException.NotFound e) {
-            // bike-service returned 404 — the bike does not exist
             throw new BikeNotFoundException(bikeId);
         } catch (RestClientException e) {
-            // Connection failure, timeout, or unexpected server error
             log.error("bike-service call failed for bikeId={}: {}", bikeId, e.getMessage());
             throw new ServiceUnavailableException("bike-service");
         }
     }
 
+    /**
+     * Wraps inventory-service HTTP call with proper exception translation.
+     */
     private InventoryClientResponse fetchInventory(Long bikeId) {
         try {
             return inventoryServiceClient.getInventoryByBikeId(bikeId);
         } catch (HttpClientErrorException.NotFound e) {
-            // No inventory record = bike not available for purchase
             throw new BikeNotFoundException(bikeId);
         } catch (RestClientException e) {
             log.error("inventory-service call failed for bikeId={}: {}", bikeId, e.getMessage());
@@ -202,5 +406,43 @@ public class OrderService {
         String date = LocalDate.now().toString().replace("-", "");
         String unique = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
         return "ORD-" + date + "-" + unique;
+    }
+
+    /**
+     * Builds an OrderNotificationEvent from the saved order and fires it
+     * asynchronously via NotificationAsyncSender.
+     *
+     * Best-effort: any exception here is caught and logged.
+     * Notification failure must NEVER roll back or block an order operation.
+     */
+    private void notify(Order order, OrderEventType type) {
+        try {
+            List<OrderNotificationEvent.OrderItemEvent> itemEvents = order.getItems().stream()
+                    .map(item -> OrderNotificationEvent.OrderItemEvent.builder()
+                            .bikeName(item.getBikeName())
+                            .quantity(item.getQuantity())
+                            .unitPrice(item.getBikePrice())
+                            .subtotal(item.getSubtotal())
+                            .build())
+                    .toList();
+
+            OrderNotificationEvent event = OrderNotificationEvent.builder()
+                    .type(type)
+                    .orderId(order.getId())
+                    .orderNumber(order.getOrderNumber())
+                    .userEmail(order.getUserEmail())
+                    .occurredAt(Instant.now())
+                    .items(itemEvents)
+                    .totalAmount(order.getTotalAmount())
+                    .shippingAddress(order.getShippingAddress())
+                    .metadata(OrderNotificationEvent.EventMetadata.builder().build())
+                    .build();
+
+            notificationAsyncSender.send(event);
+
+        } catch (Exception e) {
+            log.warn("Could not build notification event for order={} type={}: {}",
+                    order.getOrderNumber(), type, e.getMessage());
+        }
     }
 }

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.hero</groupId>
+        <artifactId>hero-ecom-platform</artifactId>
+        <version>1.0.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <groupId>com.hero.bikestore</groupId>
+    <artifactId>notification-service</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>notification-service</name>
+    <description>Notification service — handles email notifications for order lifecycle events</description>
+
+    <!--
+        Inherited from hero-ecom-platform:
+          - lombok (optional)
+          - spring-boot-starter-test (test scope)
+          - maven-compiler-plugin with Lombok annotationProcessorPaths
+          - spring-boot-maven-plugin with Lombok exclusion
+          - java.version = 17
+    -->
+    <dependencies>
+
+        <!-- REST API — exposes POST /api/v1/notifications/order-event -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- JavaMailSender — sends emails via SMTP (Mailtrap in dev, real SMTP in prod) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
+        <!-- Thymeleaf — renders HTML email templates -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+
+        <!-- Bean validation — @Valid on incoming event DTO -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- Actuator — /actuator/health used by Docker healthcheck -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Shared exception library — GlobalExceptionHandler, BaseException, ErrorResponse -->
+        <dependency>
+            <groupId>com.hero</groupId>
+            <artifactId>common-exception</artifactId>
+        </dependency>
+
+        <!-- Eureka Client — registers this service with the discovery server -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+
+        <!-- Config Client — fetches configuration from config-server on startup -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-config</artifactId>
+        </dependency>
+
+        <!-- Swagger UI — http://localhost:8085/swagger-ui/index.html -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>3.0.2</version>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Configs inherited from parent pluginManagement -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

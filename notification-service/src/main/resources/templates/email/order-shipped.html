@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Order Shipped</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f4f4f4; font-family:Arial, sans-serif;">
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4; padding:30px 0;">
+    <tr>
+        <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+
+                <!-- HEADER -->
+                <tr>
+                    <td style="background-color:#e65100; padding:30px 40px; text-align:center;">
+                        <h1 style="color:#ffffff; margin:0; font-size:24px;">Hero Bike Store</h1>
+                        <p style="color:#ffccaa; margin:8px 0 0; font-size:14px;">Your Bike Is On Its Way!</p>
+                    </td>
+                </tr>
+
+                <!-- BODY -->
+                <tr>
+                    <td style="padding:40px;">
+
+                        <h2 style="color:#333333; margin:0 0 16px;">Your Order Has Been Shipped!</h2>
+                        <p style="color:#555555; font-size:15px; line-height:1.6; margin:0 0 24px;">
+                            Hi <span th:text="${event.userName != null ? event.userName : event.userEmail}">Customer</span>,
+                            your bike is on its way! Our delivery partner has picked up your order.
+                        </p>
+
+                        <!-- ORDER NUMBER BOX -->
+                        <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#fff3ee; border-left:4px solid #e65100; border-radius:4px; margin-bottom:16px;">
+                            <tr>
+                                <td style="padding:16px 20px;">
+                                    <p style="margin:0; font-size:13px; color:#666666;">Order Number</p>
+                                    <p style="margin:4px 0 0; font-size:20px; font-weight:bold; color:#e65100;" th:text="${event.orderNumber}">ORD-20260321-XXXX</p>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- TRACKING ID -->
+                        <div th:if="${event.metadata != null and event.metadata.trackingId != null}"
+                             style="background-color:#f3f0ff; border-left:4px solid #7c4dff; border-radius:4px; padding:16px 20px; margin-bottom:16px;">
+                            <p style="margin:0; font-size:13px; color:#666666;">Tracking ID</p>
+                            <p style="margin:4px 0 0; font-size:18px; font-weight:bold; color:#7c4dff; letter-spacing:1px;" th:text="${event.metadata.trackingId}">TRK-XXXXXXXX</p>
+                        </div>
+
+                        <!-- ESTIMATED DELIVERY -->
+                        <div th:if="${event.metadata != null and event.metadata.estimatedDelivery != null}"
+                             style="background-color:#fff8e1; border-left:4px solid #f9a825; border-radius:4px; padding:16px 20px; margin-bottom:24px;">
+                            <p style="margin:0; font-size:13px; color:#666666;">Expected Delivery</p>
+                            <p style="margin:4px 0 0; font-size:16px; font-weight:bold; color:#f9a825;" th:text="${event.metadata.estimatedDelivery}">March 25, 2026</p>
+                        </div>
+
+                        <!-- SHIPPING ADDRESS -->
+                        <h3 style="color:#333333; font-size:16px; margin:0 0 8px;">Delivering To</h3>
+                        <p style="color:#555555; font-size:14px; margin:0 0 24px;" th:text="${event.shippingAddress}">123 MG Road, Bangalore 560001</p>
+
+                        <p style="color:#777777; font-size:13px; margin:0;">
+                            We'll send you a final confirmation once the delivery is complete.
+                        </p>
+
+                    </td>
+                </tr>
+
+                <!-- FOOTER -->
+                <tr>
+                    <td style="background-color:#f8f8f8; padding:20px 40px; text-align:center; border-top:1px solid #eeeeee;">
+                        <p style="color:#aaaaaa; font-size:12px; margin:0;">
+                            © 2026 Hero Bike Store. All rights reserved.
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

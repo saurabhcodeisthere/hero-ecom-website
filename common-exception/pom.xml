@@ -36,6 +36,17 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!--
+            Security — needed ONLY for AccessDeniedException in GlobalExceptionHandler.
+            Every service that uses common-exception is a Spring Security resource server,
+            so this dependency is always present in the final application classpath.
+            Declared here so the handler compiles cleanly as a shared library.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>

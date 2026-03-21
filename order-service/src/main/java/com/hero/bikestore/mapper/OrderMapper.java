@@ -1,5 +1,6 @@
 package com.hero.bikestore.mapper;
 
+import com.hero.bikestore.dto.response.AdminOrderResponse;
 import com.hero.bikestore.dto.response.OrderItemResponse;
 import com.hero.bikestore.dto.response.OrderResponse;
 import com.hero.bikestore.entity.Order;
@@ -11,13 +12,18 @@ import java.util.List;
 /**
  * Converts Order/OrderItem entities to response DTOs.
  *
+ * Two views:
+ *   toResponse()      → customer view  (hides userId, userEmail, updatedAt)
+ *   toAdminResponse() → admin view     (exposes userId, userEmail, updatedAt)
+ *
  * Why manual mapping instead of ModelMapper or MapStruct?
- *   - Explicit control over what fields are exposed to the client
- *   - Internal fields (userId, version, updatedAt) are intentionally excluded
+ *   - Explicit control over what fields are exposed to each caller
  *   - No risk of accidentally leaking sensitive fields if entity grows later
  */
 @Component
 public class OrderMapper {
+
+    // ── Customer view — never exposes who placed the order ───────────────────
 
     public OrderResponse toResponse(Order order) {
         return OrderResponse.builder()
@@ -30,6 +36,25 @@ public class OrderMapper {
                 .items(toItemResponseList(order.getItems()))
                 .build();
     }
+
+    // ── Admin view — full traceability for operations and support ─────────────
+
+    public AdminOrderResponse toAdminResponse(Order order) {
+        return AdminOrderResponse.builder()
+                .orderId(order.getId())
+                .orderNumber(order.getOrderNumber())
+                .userId(order.getUserId())           // visible to admin only
+                .userEmail(order.getUserEmail())     // visible to admin only
+                .status(order.getStatus().name())
+                .totalAmount(order.getTotalAmount())
+                .shippingAddress(order.getShippingAddress())
+                .createdAt(order.getCreatedAt())
+                .updatedAt(order.getUpdatedAt())     // visible to admin only
+                .items(toItemResponseList(order.getItems()))
+                .build();
+    }
+
+    // ── Shared ────────────────────────────────────────────────────────────────
 
     private List<OrderItemResponse> toItemResponseList(List<OrderItem> items) {
         return items.stream()

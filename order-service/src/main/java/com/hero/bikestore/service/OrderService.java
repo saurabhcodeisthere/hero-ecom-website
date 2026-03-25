@@ -21,6 +21,7 @@ import com.hero.bikestore.exception.InvalidOrderStateException;
 import com.hero.bikestore.exception.OrderNotFoundException;
 import com.hero.bikestore.exception.ServiceUnavailableException;
 import com.hero.bikestore.mapper.OrderMapper;
+import com.hero.bikestore.publisher.EventPublisher;
 import com.hero.bikestore.repository.OrderRepository;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
@@ -50,7 +51,7 @@ public class OrderService {
     private final OrderMapper orderMapper;
     private final BikeServiceClient bikeServiceClient;
     private final InventoryServiceClient inventoryServiceClient;
-    private final NotificationAsyncSender notificationAsyncSender;
+    private final EventPublisher eventPublisher;
 
     // ═════════════════════════════════════════════════════════════════════════
     // CUSTOMER OPERATIONS
@@ -409,8 +410,13 @@ public class OrderService {
     }
 
     /**
-     * Builds an OrderNotificationEvent from the saved order and fires it
-     * asynchronously via NotificationAsyncSender.
+     * Builds an OrderNotificationEvent from the saved order and publishes
+     * it to RabbitMQ via EventPublisher.
+     *
+     * WHY EventPublisher and not RabbitMQEventPublisher directly?
+     * ─────────────────────────────────────────────────────────────
+     * Dependency Inversion Principle — OrderService depends on the abstraction.
+     * Swapping the message broker (RabbitMQ → Kafka) requires zero changes here.
      *
      * Best-effort: any exception here is caught and logged.
      * Notification failure must NEVER roll back or block an order operation.
@@ -438,7 +444,7 @@ public class OrderService {
                     .metadata(OrderNotificationEvent.EventMetadata.builder().build())
                     .build();
 
-            notificationAsyncSender.send(event);
+            eventPublisher.publish(event);
 
         } catch (Exception e) {
             log.warn("Could not build notification event for order={} type={}: {}",

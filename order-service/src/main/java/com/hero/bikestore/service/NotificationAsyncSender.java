@@ -8,25 +8,24 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 /**
- * Fires order notification events asynchronously to notification-service.
+ * [DISABLED — KEPT FOR REFERENCE]
  *
- * WHY a separate class instead of @Async inside OrderService?
- * ─────────────────────────────────────────────────────────────
- * @Async works via Spring proxy. When OrderService calls this.send()
- * on itself, the call bypasses the proxy — @Async does nothing.
+ * Original HTTP-based async notification sender.
+ * Replaced by RabbitMQ event publishing (RabbitMQEventPublisher).
  *
- * By injecting NotificationAsyncSender into OrderService, Spring injects
- * the PROXY of this class. Every call to notificationAsyncSender.send()
- * goes through the proxy, which intercepts it and spawns a background thread.
+ * WHY KEPT:
+ *   - Documents the previous approach for learning and comparison
+ *   - Can be re-enabled by restoring @Component if RabbitMQ is removed
  *
- * RESULT:
- *   order-service thread → saves order → returns 201 immediately
- *   background thread    → calls notification-service → email sent
+ * WHY DISABLED:
+ *   - Direct HTTP coupling: if notification-service is down, email is lost forever
+ *   - No retry mechanism — one failure = one lost notification
+ *   - Replaced by RabbitMQ which provides durability, retry and decoupling
  *
- * The customer NEVER waits for the email. If notification-service is down,
- * the error is logged but the order is unaffected (best-effort).
+ * TO RE-ENABLE: restore @Component below
  */
-@Component
+// @Component   ← DISABLED: replaced by RabbitMQEventPublisher
+@Deprecated
 @RequiredArgsConstructor
 @Slf4j
 public class NotificationAsyncSender {

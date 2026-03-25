@@ -44,6 +44,31 @@ services:
       - bikestore-network
 
   # ─────────────────────────────────────────────────────────────
+  # LAYER 1 (cont): RabbitMQ — Message broker
+  # order-service publishes to it, notification-service consumes.
+  # Management UI available at http://localhost:15672
+  # Default credentials: guest / guest
+  # ─────────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"     # AMQP port — services connect here
+      - "15672:15672"   # Management UI — browser dashboard
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - bikestore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ─────────────────────────────────────────────────────────────
   # LAYER 2: Auth server + Service Registry
   # Both depend only on postgres. They start in parallel.
   # ─────────────────────────────────────────────────────────────
@@ -165,6 +190,8 @@ services:
         condition: service_healthy
       config-server:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     # No ports exposed — only reachable via gateway on port 7070
     networks:
       - bikestore-network
@@ -178,8 +205,11 @@ services:
         condition: service_healthy
       config-server:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     # No DB dependency — notification-service has no database
-    # No ports exposed — internal service called only by order-service via Eureka
+    ports:
+      - "8085:8085"   # exposed for direct testing via localhost:8085
     networks:
       - bikestore-network
     restart: unless-stopped

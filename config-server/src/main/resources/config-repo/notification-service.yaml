@@ -17,11 +17,23 @@
 #   Safe to test without spamming real users.
 # ─────────────────────────────────────────────────────────────────────────────
 spring:
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # RABBITMQ — Message broker connection
+  # notification-service consumes order events from notification.queue
+  # RabbitMQ container name = "rabbitmq" (Docker internal hostname)
+  # ─────────────────────────────────────────────────────────────────────────
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: guest
+    password: guest
+
   mail:
     host: sandbox.smtp.mailtrap.io
     port: 2525
-    username: YOUR_MAILTRAP_USERNAME      # ← replace with your Mailtrap username
-    password: YOUR_MAILTRAP_PASSWORD      # ← replace with your Mailtrap password
+    username: 774206ff373a87      # ← replace with your Mailtrap username
+    password: 21ff25445e0001q    # ← replace with your Mailtrap password
     properties:
       mail:
         smtp:

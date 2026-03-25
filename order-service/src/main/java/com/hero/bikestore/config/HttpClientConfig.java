@@ -78,23 +78,23 @@ public class HttpClientConfig {
                 .createClient(InventoryServiceClient.class);
     }
 
-    /**
-     * HTTP interface proxy for notification-service.
-     *
-     * Called only from NotificationAsyncSender (@Async) — the HTTP call
-     * itself is synchronous but the calling thread is a background thread,
-     * so order-service's main request thread is never blocked.
-     */
-    @Bean
-    public NotificationServiceClient notificationServiceClient(LoadBalancerClient loadBalancerClient) {
-        RestClient restClient = RestClient.builder()
-                .baseUrl("http://notification-service")
-                .requestInterceptor(new LoadBalancerInterceptor(loadBalancerClient))
-                .build();
-
-        return HttpServiceProxyFactory
-                .builderFor(RestClientAdapter.create(restClient))
-                .build()
-                .createClient(NotificationServiceClient.class);
-    }
+    // ─────────────────────────────────────────────────────────────────────
+    // DISABLED — NotificationServiceClient HTTP bean
+    // ─────────────────────────────────────────────────────────────────────
+    // Replaced by RabbitMQEventPublisher — order-service now publishes
+    // events to RabbitMQ instead of calling notification-service directly.
+    //
+    // TO RE-ENABLE: restore @Bean below
+    // ─────────────────────────────────────────────────────────────────────
+    // @Bean
+    // public NotificationServiceClient notificationServiceClient(LoadBalancerClient loadBalancerClient) {
+    //     RestClient restClient = RestClient.builder()
+    //             .baseUrl("http://notification-service")
+    //             .requestInterceptor(new LoadBalancerInterceptor(loadBalancerClient))
+    //             .build();
+    //     return HttpServiceProxyFactory
+    //             .builderFor(RestClientAdapter.create(restClient))
+    //             .build()
+    //             .createClient(NotificationServiceClient.class);
+    // }
 }

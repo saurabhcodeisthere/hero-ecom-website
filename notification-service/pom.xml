@@ -77,6 +77,13 @@
             <artifactId>spring-cloud-starter-config</artifactId>
         </dependency>
 
+        <!-- RabbitMQ — consumes order events from message queue -->
+        <!-- Replaces REST controller endpoint approach -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
         <!-- Swagger UI — http://localhost:8085/swagger-ui/index.html -->
         <dependency>
             <groupId>org.springdoc</groupId>

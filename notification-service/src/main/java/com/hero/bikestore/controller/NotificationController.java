@@ -14,18 +14,24 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Single entry point for all order notification events.
+ * [DISABLED — KEPT FOR REFERENCE]
  *
- * WHY one endpoint for all event types?
- * ───────────────────────────────────────
- * The event type field inside the payload drives routing.
- * Adding a new event type requires only a new handler class —
- * this controller never needs to change. OCP satisfied.
+ * Original HTTP REST endpoint for receiving order notification events.
+ * Replaced by RabbitMQ listener (NotificationListener).
  *
- * This endpoint is internal — called only by order-service
- * via HTTP Interface + @Async. Not exposed to external clients.
+ * WHY KEPT:
+ *   - Documents the previous HTTP-based approach for learning and comparison
+ *   - Can be re-enabled by restoring @RestController if RabbitMQ is removed
+ *
+ * WHY DISABLED:
+ *   - order-service called this directly over HTTP — tight coupling
+ *   - If this service was down, the HTTP call failed and email was lost
+ *   - Replaced by @RabbitListener which consumes from a durable queue
+ *
+ * TO RE-ENABLE: restore @RestController below
  */
-@RestController
+// @RestController  ← DISABLED: replaced by NotificationListener
+@Deprecated
 @RequestMapping("/api/v1/notifications")
 @RequiredArgsConstructor
 @Slf4j

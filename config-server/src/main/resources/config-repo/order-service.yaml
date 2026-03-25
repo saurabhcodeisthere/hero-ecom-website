@@ -3,6 +3,18 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 spring:
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # RABBITMQ — Message broker connection
+  # order-service publishes order events to the order.events exchange
+  # RabbitMQ container name = "rabbitmq" (Docker internal hostname)
+  # ─────────────────────────────────────────────────────────────────────────
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: guest
+    password: guest
+
   datasource:
     url: jdbc:postgresql://postgres:5432/orderdb
     username: bikestore

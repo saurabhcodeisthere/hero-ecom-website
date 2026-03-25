@@ -387,6 +387,83 @@ Jackson serializes `OrderResponse` into JSON and writes it to the HTTP response 
 
 ---
 
+## Layer 11 — RabbitMQ Notification (Background — After Response Sent)
+
+After the order is saved and `201 Created` is returned to the customer,
+`OrderService.notify()` publishes an event to RabbitMQ.
+
+This happens **after** the response — the customer never waits for it.
+
+```
+OrderService.notify(savedOrder, OrderEventType.ORDER_PLACED)
+        │
+        ▼
+Builds OrderNotificationEvent:
+{
+  type          : ORDER_PLACED
+  orderId       : 42
+  orderNumber   : "ORD-20260318-A3F9C1B2"
+  userEmail     : "vaibhav@hero.com"
+  userName      : "Vaibhav"
+  occurredAt    : 2026-03-18T09:36:38Z
+  totalAmount   : 303000.00
+  shippingAddress: "123 MG Road, Bangalore"
+  items: [
+    { bikeName: "Hero Splendor Plus", quantity:2, unitPrice:77000, subtotal:154000 }
+    { bikeName: "Hero Xpulse 200 4V", quantity:1, unitPrice:149000, subtotal:149000 }
+  ]
+  metadata: { trackingId:null, estimatedDelivery:null, cancellationReason:null }
+}
+        │
+        ▼
+EventPublisher.publish(event)          ← depends on abstraction, not RabbitMQ directly
+        │
+        ▼
+RabbitMQEventPublisher.publish(event)
+  routingKey = "order.placed"          ← derived from ORDER_PLACED enum
+  rabbitTemplate.convertAndSend(
+    "order.events",                    ← exchange
+    "order.placed",                    ← routing key
+    event                              ← serialised as JSON
+  )
+        │
+        ▼
+RabbitMQ routes to notification.queue
+        │
+        ▼
+notification-service consumes → sends ORDER_PLACED email to customer
+```
+
+### Why EventPublisher Interface (Not RabbitMQ Directly)
+
+```
+OrderService depends on:  EventPublisher (interface)   ← Dependency Inversion
+                                  ↑
+                    RabbitMQEventPublisher (impl)       ← wired by Spring
+
+Swapping RabbitMQ → Kafka tomorrow:
+  ✅ Write KafkaEventPublisher implements EventPublisher
+  ❌ OrderService — ZERO changes
+```
+
+### Notification Events Per Order Action
+
+| Action | Routing Key Published | Email Sent |
+|---|---|---|
+| Place order | `order.placed` | Order Confirmation |
+| Admin confirms | `order.confirmed` | We Are Preparing Your Order |
+| Admin ships | `order.shipped` | Your Bike Is On The Way |
+| Admin delivers | `order.delivered` | Your Bike Has Arrived |
+| Cancel order | `order.cancelled` | Your Order Has Been Cancelled |
+
+### Disabled Code — Kept for Reference
+
+`NotificationAsyncSender.java` (`@Component` removed) — the original approach
+that called notification-service directly over HTTP via `@Async` background thread.
+Kept for learning comparison. Can be re-enabled by restoring `@Component`.
+
+---
+
 ## Final HTTP Response
 
 ```
@@ -444,24 +521,58 @@ Content-Type: application/json
 ```
 order-service
     │
+    ├── HTTP (synchronous — blocks until response)
+    │
     ├── GET  /api/v1/bikes/{id}                        → bike-service
     │        (per item: validate bike exists, get name + price)
     │
     ├── GET  /api/v1/inventories/bike/{bikeId}         → inventory-service
     │        (per item: check stock is sufficient)
     │
-    └── PATCH /api/v1/inventories/bike/{bikeId}/reduce → inventory-service
-             (per item: atomically deduct stock)
+    ├── PATCH /api/v1/inventories/bike/{bikeId}/reduce → inventory-service
+    │        (per item: atomically deduct stock)
+    │
+    └── RabbitMQ (asynchronous — fire and forget)
+         │
+         └── rabbitTemplate.convertAndSend()           → order.events exchange
+                  routing key: "order.placed"                   │
+                                                       notification.queue
+                                                                │
+                                                       notification-service
+                                                       (sends email)
 ```
 
-All calls go through:
+### HTTP Calls — How They Work
+
+All HTTP calls go through:
 1. `HttpServiceProxyFactory` — converts Java method call to HTTP request
 2. `LoadBalancerInterceptor` — resolves service name to real IP via Eureka
 3. `RestClient` — sends the actual HTTP request
 4. Jackson — converts response JSON back to a Java object
 
-No JWT is passed in these internal calls — services communicate within
+No JWT is passed in internal calls — services communicate within
 the Docker network and trust each other at the network level.
+
+### RabbitMQ — How It Works
+
+```
+EventPublisher (interface)              ← order-service depends on this
+    │
+RabbitMQEventPublisher (impl)           ← Spring wires this
+    │
+RabbitTemplate.convertAndSend()         ← puts message on exchange
+    │
+order.events (Topic Exchange)           ← RabbitMQ routes by routing key
+    │
+notification.queue                      ← notification-service owns this
+    │
+NotificationListener (@RabbitListener)  ← consumes and sends email
+```
+
+Key difference from HTTP:
+- HTTP: order-service waits for notification-service to respond
+- RabbitMQ: order-service publishes and moves on — no waiting
+- If notification-service is down: HTTP loses the email, RabbitMQ keeps it queued
 
 ---
 
@@ -476,6 +587,9 @@ the Docker network and trust each other at the network level.
 | `CascadeType.ALL` on Order → OrderItems | Save order once, all items saved automatically |
 | `orphanRemoval = true` | Remove item from list → deleted from DB, no orphan rows |
 | `@Version` on Order | Optimistic locking prevents lost updates under concurrent requests |
+| `EventPublisher` interface instead of `RabbitTemplate` directly | Dependency Inversion — swap broker without touching OrderService |
+| RabbitMQ instead of HTTP for notifications | Durability — email not lost if notification-service is down |
+| Topic exchange with dynamic routing key | Future services subscribe selectively — zero changes to order-service |
 
 ---
 ---

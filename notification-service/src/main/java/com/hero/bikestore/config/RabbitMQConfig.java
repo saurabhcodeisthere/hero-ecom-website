@@ -8,6 +8,7 @@ import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.support.converter.JacksonJavaTypeMapper;
 import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
@@ -75,6 +76,13 @@ public class RabbitMQConfig {
     public Queue notificationQueue() {
         return QueueBuilder.durable(QUEUE_NAME)
                 .withArgument("x-dead-letter-exchange", DLQ_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", QUEUE_NAME)
+                // ↑ WHY THIS IS NEEDED:
+                // When RabbitMQ dead-letters a message it uses the ORIGINAL
+                // routing key (e.g. "order.confirmed") to publish to the DLQ exchange.
+                // Our DLQ binding only matches "notification.queue".
+                // Without this override: "order.confirmed" ≠ "notification.queue" → message DROPPED.
+                // With this override: RabbitMQ uses "notification.queue" → matches DLQ binding → ✅
                 .build();
     }
 
@@ -143,10 +151,20 @@ public class RabbitMQConfig {
     /**
      * JSON message converter — deserialises incoming JSON back to
      * OrderNotificationEvent. Must match the converter used by the publisher.
+     *
+     * TypePrecedence.INFERRED:
+     * Ignores the __TypeId__ header added by order-service (which contains
+     * order-service's package name). Instead, Spring uses the @RabbitListener
+     * method parameter type to determine the target class.
+     * This prevents ClassNotFoundException when package names differ across services.
+     * Note: INFERRED is already the default in Spring AMQP 4.0 — this line
+     * is explicit to make the intent visible.
      */
     @Bean
     public MessageConverter jsonMessageConverter() {
-        return new JacksonJsonMessageConverter();
+        JacksonJsonMessageConverter converter = new JacksonJsonMessageConverter();
+        converter.setTypePrecedence(JacksonJavaTypeMapper.TypePrecedence.INFERRED);
+        return converter;
     }
 
     /**

@@ -214,6 +214,24 @@ services:
       - bikestore-network
     restart: unless-stopped
 
+  payment-service:
+    build: ../payment-service
+    container_name: payment-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "8086:8086"   # exposed for direct testing + mock checkout via localhost:8086
+    networks:
+      - bikestore-network
+    restart: unless-stopped
+
   # ─────────────────────────────────────────────────────────────
   # LAYER 4: API Gateway — starts last
   # ─────────────────────────────────────────────────────────────
@@ -232,6 +250,8 @@ services:
       user-service:
         condition: service_started
       order-service:
+        condition: service_started
+      payment-service:
         condition: service_started
     ports:
       - "7070:7070"

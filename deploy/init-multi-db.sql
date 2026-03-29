@@ -2,3 +2,4 @@ CREATE DATABASE inventorydb;
 CREATE DATABASE userdb;
 CREATE DATABASE keycloakdb;
 CREATE DATABASE orderdb;
+CREATE DATABASE paymentdb;

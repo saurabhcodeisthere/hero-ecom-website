@@ -3,6 +3,7 @@ package com.hero.bikestore.config;
 import com.hero.bikestore.client.BikeServiceClient;
 import com.hero.bikestore.client.InventoryServiceClient;
 import com.hero.bikestore.client.NotificationServiceClient;
+import com.hero.bikestore.client.PaymentServiceClient;
 import org.springframework.cloud.client.loadbalancer.LoadBalancerClient;
 import org.springframework.cloud.client.loadbalancer.LoadBalancerInterceptor;
 import org.springframework.context.annotation.Bean;
@@ -76,6 +77,25 @@ public class HttpClientConfig {
                 .builderFor(RestClientAdapter.create(restClient))
                 .build()
                 .createClient(InventoryServiceClient.class);
+    }
+
+    /**
+     * HTTP interface proxy for payment-service.
+     *
+     * Used during order placement to initiate payment and receive the checkout URL.
+     * The URL is returned to the frontend so the customer can be redirected to pay.
+     */
+    @Bean
+    public PaymentServiceClient paymentServiceClient(LoadBalancerClient loadBalancerClient) {
+        RestClient restClient = RestClient.builder()
+                .baseUrl("http://payment-service")
+                .requestInterceptor(new LoadBalancerInterceptor(loadBalancerClient))
+                .build();
+
+        return HttpServiceProxyFactory
+                .builderFor(RestClientAdapter.create(restClient))
+                .build()
+                .createClient(PaymentServiceClient.class);
     }
 
     // ─────────────────────────────────────────────────────────────────────

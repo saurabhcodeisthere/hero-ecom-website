@@ -1,0 +1,50 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# PAYMENT SERVICE CONFIG
+# ─────────────────────────────────────────────────────────────────────────────
+
+spring:
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # RABBITMQ — Message broker connection
+  # payment-service listens to payment.command.queue (receives payment commands)
+  # payment-service publishes to payment.events exchange (publishes results)
+  # RabbitMQ container name = "rabbitmq" (Docker internal hostname)
+  # ─────────────────────────────────────────────────────────────────────────
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: guest
+    password: guest
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # DATASOURCE — paymentdb stores Payment records (status, transactionId etc.)
+  # ─────────────────────────────────────────────────────────────────────────
+  datasource:
+    url: jdbc:postgresql://postgres:5432/paymentdb
+    username: bikestore
+    password: bikestore
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PAYMENT — mode controls which PaymentProcessor implementation is used
+# dev  → MockPaymentProcessor  (@Profile("dev"))  — no real payment gateway
+# prod → RazorpayPaymentProcessor (@Profile("prod")) — real Razorpay SDK
+# ─────────────────────────────────────────────────────────────────────────────
+payment:
+  mode: dev
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LOGGING — Explicitly set INFO for our package so logs always appear in Docker
+# Root stays INFO (Spring Boot default). Our package is set explicitly to avoid
+# any env-level override silencing it.
+# ─────────────────────────────────────────────────────────────────────────────
+logging:
+  level:
+    root: INFO
+    com.hero.bikestore: INFO

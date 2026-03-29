@@ -77,3 +77,13 @@ resilience4j:
         # Only these are worth retrying — a 404 or 400 will never succeed on retry.
         retry-exceptions:
           - org.springframework.web.client.ResourceAccessException
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LOGGING — Explicitly set INFO for our package so logs always appear in Docker
+# Root stays INFO (Spring Boot default). Our package is set explicitly to avoid
+# any env-level override silencing it.
+# ─────────────────────────────────────────────────────────────────────────────
+logging:
+  level:
+    root: INFO
+    com.hero.bikestore: INFO

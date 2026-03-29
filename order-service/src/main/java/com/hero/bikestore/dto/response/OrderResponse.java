@@ -20,4 +20,9 @@ public class OrderResponse {
     private String shippingAddress;
     private LocalDateTime createdAt;
     private List<OrderItemResponse> items;
+
+    // Present only in the order placement response (AWAITING_PAYMENT).
+    // Frontend uses this URL to redirect the customer to the payment page.
+    // Null for all other order queries (order is already past payment stage).
+    private String paymentUrl;
 }

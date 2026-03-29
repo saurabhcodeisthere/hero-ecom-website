@@ -34,6 +34,7 @@ public class OrderMapper {
                 .shippingAddress(order.getShippingAddress())
                 .createdAt(order.getCreatedAt())
                 .items(toItemResponseList(order.getItems()))
+                .paymentUrl(order.getPaymentUrl())   // null once order moves past AWAITING_PAYMENT
                 .build();
     }
 

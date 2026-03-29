@@ -21,6 +21,9 @@ import com.hero.bikestore.exception.InvalidOrderStateException;
 import com.hero.bikestore.exception.OrderNotFoundException;
 import com.hero.bikestore.exception.ServiceUnavailableException;
 import com.hero.bikestore.mapper.OrderMapper;
+import com.hero.bikestore.client.PaymentServiceClient;
+import com.hero.bikestore.dto.payment.PaymentInitiationResult;
+import com.hero.bikestore.dto.payment.ProcessPaymentCommand;
 import com.hero.bikestore.publisher.EventPublisher;
 import com.hero.bikestore.repository.OrderRepository;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -47,11 +50,12 @@ import java.util.UUID;
 @Slf4j
 public class OrderService {
 
-    private final OrderRepository orderRepository;
-    private final OrderMapper orderMapper;
-    private final BikeServiceClient bikeServiceClient;
+    private final OrderRepository        orderRepository;
+    private final OrderMapper            orderMapper;
+    private final BikeServiceClient      bikeServiceClient;
     private final InventoryServiceClient inventoryServiceClient;
-    private final EventPublisher eventPublisher;
+    private final EventPublisher         eventPublisher;
+    private final PaymentServiceClient   paymentServiceClient;
 
     // ═════════════════════════════════════════════════════════════════════════
     // CUSTOMER OPERATIONS
@@ -82,7 +86,7 @@ public class OrderService {
                 .orderNumber(generateOrderNumber())
                 .userId(userId)
                 .userEmail(userEmail)
-                .status(OrderStatus.PENDING)
+                .status(OrderStatus.AWAITING_PAYMENT)
                 .shippingAddress(request.getShippingAddress())
                 .totalAmount(BigDecimal.ZERO)
                 .build();
@@ -128,11 +132,34 @@ public class OrderService {
         order.setTotalAmount(total);
 
         Order saved = orderRepository.save(order);
-        log.info("Order placed: orderNumber={}, total={}", saved.getOrderNumber(), saved.getTotalAmount());
+        log.info("Order placed: orderNumber={}, total={}, status={}",
+                saved.getOrderNumber(), saved.getTotalAmount(), saved.getStatus());
 
+        // Call payment-service via HTTP — get checkout URL synchronously
+        // order-service is the ORCHESTRATOR — it tells payment-service what to do
+        // HTTP is used here (not RabbitMQ) because we need the paymentUrl
+        // returned immediately to give to the frontend
+        ProcessPaymentCommand paymentCommand = ProcessPaymentCommand.builder()
+                .orderId(saved.getId().toString())
+                .orderNumber(saved.getOrderNumber())
+                .amount(saved.getTotalAmount())
+                .userEmail(saved.getUserEmail())
+                .userName(saved.getUserId())     // userId as userName — update when profile service added
+                .build();
+
+        PaymentInitiationResult paymentResult = initiatePayment(paymentCommand);
+
+        // Persist paymentUrl so GET /orders/{id} can return it while AWAITING_PAYMENT
+        saved.setPaymentUrl(paymentResult.getPaymentUrl());
+        orderRepository.save(saved);
+
+        // Notify customer: order received and payment is being processed
         notify(saved, OrderEventType.ORDER_PLACED);
 
-        return orderMapper.toResponse(saved);
+        // Include paymentUrl in response — frontend redirects customer to this URL
+        OrderResponse response = orderMapper.toResponse(saved);
+        response.setPaymentUrl(paymentResult.getPaymentUrl());
+        return response;
     }
 
     /**
@@ -199,9 +226,10 @@ public class OrderService {
             throw new ForbiddenException("You are not authorized to cancel this order");
         }
 
-        if (order.getStatus() != OrderStatus.PENDING) {
+        if (order.getStatus() != OrderStatus.PENDING &&
+            order.getStatus() != OrderStatus.AWAITING_PAYMENT) {
             throw new InvalidOrderStateException(
-                    "Only PENDING orders can be cancelled by the customer. " +
+                    "Only PENDING or AWAITING_PAYMENT orders can be cancelled by the customer. " +
                     "Current status: " + order.getStatus() +
                     ". Please contact support to cancel orders that are already confirmed or shipped."
             );
@@ -303,7 +331,7 @@ public class OrderService {
             order.getStatus() == OrderStatus.CANCELLED) {
             throw new InvalidOrderStateException(
                     "Cannot cancel an order with status: " + order.getStatus() + ". " +
-                    "Only PENDING and CONFIRMED orders can be cancelled."
+                    "Only AWAITING_PAYMENT, PENDING and CONFIRMED orders can be cancelled."
             );
         }
 
@@ -372,6 +400,20 @@ public class OrderService {
                 log.error("Failed to restore stock for bikeId={} on order {}: {}",
                         item.getBikeId(), order.getOrderNumber(), e.getMessage());
             }
+        }
+    }
+
+    /**
+     * Wraps payment-service HTTP call with proper exception translation.
+     * If payment-service is down, ServiceUnavailableException is thrown —
+     * the circuit breaker fallback handles it and the order is rolled back.
+     */
+    private PaymentInitiationResult initiatePayment(ProcessPaymentCommand command) {
+        try {
+            return paymentServiceClient.initiatePayment(command);
+        } catch (RestClientException e) {
+            log.error("payment-service call failed for orderId={}: {}", command.getOrderId(), e.getMessage());
+            throw new ServiceUnavailableException("payment-service");
         }
     }
 

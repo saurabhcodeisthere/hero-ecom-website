@@ -46,6 +46,12 @@ public class Order {
     @Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalAmount;
 
+    // Checkout URL returned by payment-service after initiation.
+    // Stored so frontend can retrieve it via GET /orders/{id} while order is AWAITING_PAYMENT.
+    // Null for orders that were confirmed/cancelled before this field was added.
+    @Column(name = "payment_url")
+    private String paymentUrl;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

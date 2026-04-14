@@ -30,6 +30,11 @@ public class GatewayConfig {
                         .path("/api/v1/orders/**", "/api/v1/admin/orders/**")
                         .filters(GatewayFilterSpec::tokenRelay)
                         .uri("lb://order-service"))       // resolves via Eureka registry
+
+                .route("cart-service", r -> r
+                        .path("/api/v1/cart/**", "/api/v1/admin/carts/**")
+                        .filters(GatewayFilterSpec::tokenRelay)
+                        .uri("lb://cart-service"))        // resolves via Eureka registry
                 .build();
     }
 }

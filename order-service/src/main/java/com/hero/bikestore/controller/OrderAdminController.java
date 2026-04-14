@@ -17,21 +17,38 @@ public class OrderAdminController {
     private final OrderService orderService;
 
     /**
-     * GET /api/v1/admin/orders?page=0&size=20&status=PENDING
+     * GET /api/v1/admin/orders
      *
-     * Returns all orders with pagination. Optionally filter by status.
-     * status is optional — omit to get all orders regardless of status.
+     * Returns all orders with pagination. All filter params are optional —
+     * omit any to get all orders regardless of that field.
+     *
+     * Query params:
+     *   page    — zero-based page number (default 0)
+     *   size    — page size (default 20)
+     *   status  — filter by order status (e.g. CONFIRMED, SHIPPED)
+     *   city    — filter by delivery city   (case-insensitive exact match)
+     *   state   — filter by delivery state  (case-insensitive exact match)
+     *   pincode — filter by delivery pincode
+     *
+     * Examples:
+     *   GET /api/v1/admin/orders
+     *   GET /api/v1/admin/orders?status=CONFIRMED
+     *   GET /api/v1/admin/orders?city=Mumbai&state=Maharashtra
+     *   GET /api/v1/admin/orders?status=SHIPPED&city=Delhi&page=1&size=10
      *
      * Returns 200 OK with paginated list including userId and userEmail.
      */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<PagedOrderResponse> getAllOrders(
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "0")  int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) OrderStatus status) {
+            @RequestParam(required = false) OrderStatus status,
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false) String pincode) {
 
-        return ResponseEntity.ok(orderService.getAllOrders(page, size, status));
+        return ResponseEntity.ok(orderService.getAllOrders(page, size, status, city, state, pincode));
     }
 
     /**

@@ -52,8 +52,17 @@ public class OrderNotificationEvent {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class EventMetadata {
+        // Present for ORDER_SHIPPED
         private String trackingId;
+
+        // Present for ORDER_SHIPPED and ORDER_CONFIRMED
         private String estimatedDelivery;
+
+        // Present for ORDER_CANCELLED
         private String cancellationReason;
+
+        // Present for ORDER_PAYMENT_EXPIRY_WARNING
+        // Allows the email template to include a direct "Complete your payment" link
+        private String paymentUrl;
     }
 }

@@ -83,5 +83,9 @@ public class OrderNotificationEvent {
 
         // Present for ORDER_CANCELLED
         private String cancellationReason;
+
+        // Present for ORDER_PAYMENT_EXPIRY_WARNING
+        // Used by the email template to render a "Complete your payment" button
+        private String paymentUrl;
     }
 }

@@ -16,6 +16,7 @@ public class BikeResponse {
     private String modelName;
     private BigDecimal price;
     private BikeType type;
+    private boolean active;
 
     private EngineSpec engine;
     private WheelTyreSpec wheelsAndTyres;

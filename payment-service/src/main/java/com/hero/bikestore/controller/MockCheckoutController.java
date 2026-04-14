@@ -1,5 +1,8 @@
 package com.hero.bikestore.controller;
 
+import com.hero.bikestore.entity.Payment;
+import com.hero.bikestore.enums.PaymentStatus;
+import com.hero.bikestore.repository.PaymentRepository;
 import com.hero.bikestore.service.WebhookService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,8 +27,14 @@ import org.springframework.web.bind.annotation.*;
  * The same WebhookService code runs in both cases.
  * Switching to real Razorpay = set payment.mode=prod → this controller disappears.
  *
+ * EXPIRY ENFORCEMENT:
+ * ────────────────────
+ * The checkout page checks payment status on EVERY GET request.
+ * If status = EXPIRED → renders an "expired" page with no buttons.
+ * This prevents the customer from seeing Pay/Decline buttons after the order is cancelled.
+ *
  * Endpoints:
- *   GET  /mock/checkout/{gatewayPaymentId}         → HTML checkout page
+ *   GET  /mock/checkout/{gatewayPaymentId}         → HTML checkout page (or expired page)
  *   POST /mock/checkout/{gatewayPaymentId}/success → simulate successful payment
  *   POST /mock/checkout/{gatewayPaymentId}/failure → simulate failed payment
  */
@@ -36,15 +45,67 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 public class MockCheckoutController {
 
-    private final WebhookService webhookService;
+    private final WebhookService    webhookService;
+    private final PaymentRepository paymentRepository;
 
     /**
      * Renders the mock checkout page.
-     * Developer opens this URL in the browser after placing an order.
+     * Checks payment status first — returns an expired page if status is not INITIATED.
      */
     @GetMapping(value = "/{gatewayPaymentId}", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> checkoutPage(@PathVariable String gatewayPaymentId) {
-        log.info("Mock checkout page opened — gatewayPaymentId={}", gatewayPaymentId);
+        log.info("[MockCheckoutController] checkoutPage | ENTER — gatewayPaymentId={}", gatewayPaymentId);
+
+        // Look up payment status — if not INITIATED, show expired/completed page
+        Payment payment = paymentRepository.findByGatewayPaymentId(gatewayPaymentId).orElse(null);
+
+        if (payment == null) {
+            log.warn("[MockCheckoutController] checkoutPage — payment not found | gatewayPaymentId={}", gatewayPaymentId);
+            return ResponseEntity.ok(buildExpiredHtml(
+                    "Payment Not Found",
+                    "❓ Unknown Payment",
+                    "No payment record found for this link.",
+                    "#6c757d"
+            ));
+        }
+
+        log.info("[MockCheckoutController] checkoutPage — payment found | orderId={} status={}",
+                payment.getOrderId(), payment.getStatus());
+
+        // Guard: only show Pay/Decline buttons if payment is still INITIATED
+        if (payment.getStatus() == PaymentStatus.EXPIRED) {
+            log.info("[MockCheckoutController] checkoutPage — payment EXPIRED, showing expired page | orderId={}",
+                    payment.getOrderId());
+            return ResponseEntity.ok(buildExpiredHtml(
+                    "Payment Link Expired",
+                    "⏰ Payment Link Expired",
+                    "This payment link has expired. Your order has been automatically cancelled.",
+                    "#dc3545"
+            ));
+        }
+
+        if (payment.getStatus() == PaymentStatus.SUCCESS) {
+            log.info("[MockCheckoutController] checkoutPage — payment already SUCCESS | orderId={}", payment.getOrderId());
+            return ResponseEntity.ok(buildExpiredHtml(
+                    "Payment Already Completed",
+                    "✅ Payment Already Completed",
+                    "This payment was already processed successfully.",
+                    "#28a745"
+            ));
+        }
+
+        if (payment.getStatus() == PaymentStatus.FAILED) {
+            log.info("[MockCheckoutController] checkoutPage — payment already FAILED | orderId={}", payment.getOrderId());
+            return ResponseEntity.ok(buildExpiredHtml(
+                    "Payment Failed",
+                    "❌ Payment Was Declined",
+                    "This payment was declined. Your order has been cancelled.",
+                    "#dc3545"
+            ));
+        }
+
+        // Payment is INITIATED — render checkout page with Pay/Decline buttons
+        log.info("[MockCheckoutController] checkoutPage — rendering checkout page | orderId={}", payment.getOrderId());
 
         String html = """
                 <!DOCTYPE html>
@@ -114,33 +175,66 @@ public class MockCheckoutController {
 
     /**
      * Simulates a successful payment.
-     * Equivalent to Razorpay firing a "payment.captured" webhook.
+     * WebhookService guards against EXPIRED/FAILED status — safe to call.
      */
     @PostMapping("/{gatewayPaymentId}/success")
     public ResponseEntity<Void> simulateSuccess(@PathVariable String gatewayPaymentId) {
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         log.info("[MockCheckoutController] simulateSuccess | ENTER");
-        log.info("[MockCheckoutController] ✅ PAY button clicked in browser — gatewayPaymentId={}", gatewayPaymentId);
-        log.info("[MockCheckoutController] Delegating to WebhookService.processSuccess()");
+        log.info("[MockCheckoutController] ✅ PAY button clicked — gatewayPaymentId={}", gatewayPaymentId);
         webhookService.processSuccess(gatewayPaymentId);
-        log.info("[MockCheckoutController] simulateSuccess | EXIT — saga triggered for gatewayPaymentId={}", gatewayPaymentId);
+        log.info("[MockCheckoutController] simulateSuccess | EXIT — gatewayPaymentId={}", gatewayPaymentId);
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         return ResponseEntity.ok().build();
     }
 
     /**
      * Simulates a failed payment.
-     * Equivalent to Razorpay firing a "payment.failed" webhook.
+     * WebhookService guards against EXPIRED status — safe to call.
      */
     @PostMapping("/{gatewayPaymentId}/failure")
     public ResponseEntity<Void> simulateFailure(@PathVariable String gatewayPaymentId) {
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         log.info("[MockCheckoutController] simulateFailure | ENTER");
-        log.info("[MockCheckoutController] ❌ DECLINE button clicked in browser — gatewayPaymentId={}", gatewayPaymentId);
-        log.info("[MockCheckoutController] Delegating to WebhookService.processFailure()");
+        log.info("[MockCheckoutController] ❌ DECLINE button clicked — gatewayPaymentId={}", gatewayPaymentId);
         webhookService.processFailure(gatewayPaymentId, "Insufficient funds");
-        log.info("[MockCheckoutController] simulateFailure | EXIT — saga triggered for gatewayPaymentId={}", gatewayPaymentId);
+        log.info("[MockCheckoutController] simulateFailure | EXIT — gatewayPaymentId={}", gatewayPaymentId);
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         return ResponseEntity.ok().build();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PRIVATE HELPERS
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Builds a non-interactive "terminal state" HTML page.
+     * Shown when the payment is EXPIRED, SUCCESS, FAILED, or not found.
+     * No buttons — the customer cannot take any action.
+     */
+    private String buildExpiredHtml(String title, String heading, String message, String color) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>%s</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; display: flex; justify-content: center;
+                               align-items: center; height: 100vh; margin: 0; background: #f5f5f5; }
+                        .card { background: white; padding: 40px; border-radius: 12px;
+                                box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; width: 380px; }
+                        h2 { color: %s; margin-bottom: 16px; }
+                        p  { color: #555; line-height: 1.6; }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <h2>%s</h2>
+                        <p>%s</p>
+                        <p style="font-size:12px; color:#aaa; margin-top:24px">Hero Bikestore</p>
+                    </div>
+                </body>
+                </html>
+                """.formatted(title, color, heading, message);
     }
 }

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Complete Your Payment</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f4f4f4; font-family:Arial, sans-serif;">
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4; padding:30px 0;">
+    <tr>
+        <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+
+                <!-- HEADER -->
+                <tr>
+                    <td style="background-color:#f57c00; padding:30px 40px; text-align:center;">
+                        <h1 style="color:#ffffff; margin:0; font-size:24px;">Hero Bike Store</h1>
+                        <p style="color:#ffe0b2; margin:8px 0 0; font-size:14px;">Payment Reminder</p>
+                    </td>
+                </tr>
+
+                <!-- BODY -->
+                <tr>
+                    <td style="padding:40px;">
+
+                        <h2 style="color:#333333; margin:0 0 16px;">⏰ Your Payment Link is Expiring Soon</h2>
+                        <p style="color:#555555; font-size:15px; line-height:1.6; margin:0 0 24px;">
+                            Hi <span th:text="${event.userName != null ? event.userName : event.userEmail}">Customer</span>,
+                            you have a pending payment for your order. If payment is not completed shortly,
+                            your order will be automatically cancelled and the reserved bikes will be released.
+                        </p>
+
+                        <!-- ORDER NUMBER BOX -->
+                        <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#fff8f0; border-left:4px solid #f57c00; border-radius:4px; margin-bottom:24px;">
+                            <tr>
+                                <td style="padding:16px 20px;">
+                                    <p style="margin:0; font-size:13px; color:#666666;">Order Number</p>
+                                    <p style="margin:4px 0 0; font-size:20px; font-weight:bold; color:#f57c00;" th:text="${event.orderNumber}">ORD-20260321-XXXX</p>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- ORDER ITEMS -->
+                        <h3 style="color:#333333; font-size:16px; margin:0 0 12px;">Items in Your Order</h3>
+                        <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-bottom:24px;">
+                            <tbody>
+                                <tr th:each="item : ${event.items}">
+                                    <td style="padding:10px 12px; font-size:14px; color:#333333; border-bottom:1px solid #f0f0f0;" th:text="${item.bikeName}">Hero Splendor Plus</td>
+                                    <td style="padding:10px 12px; font-size:14px; color:#777777; text-align:center; border-bottom:1px solid #f0f0f0;">
+                                        x<span th:text="${item.quantity}">1</span>
+                                    </td>
+                                    <td style="padding:10px 12px; font-size:14px; color:#333333; text-align:right; border-bottom:1px solid #f0f0f0;">
+                                        ₹<span th:text="${#numbers.formatDecimal(item.subtotal, 0, 'COMMA', 2, 'POINT')}">75,000.00</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                            <!-- TOTAL ROW -->
+                            <tfoot>
+                                <tr>
+                                    <td colspan="2" style="padding:12px; font-size:14px; font-weight:bold; color:#333333; text-align:right;">Total</td>
+                                    <td style="padding:12px; font-size:16px; font-weight:bold; color:#f57c00; text-align:right;">
+                                        ₹<span th:text="${#numbers.formatDecimal(event.totalAmount, 0, 'COMMA', 2, 'POINT')}">75,000.00</span>
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+
+                        <!-- CTA BUTTON — shown only if paymentUrl is available -->
+                        <div th:if="${event.metadata != null and event.metadata.paymentUrl != null}"
+                             style="text-align:center; margin-bottom:24px;">
+                            <a th:href="${event.metadata.paymentUrl}"
+                               style="display:inline-block; background-color:#f57c00; color:#ffffff; text-decoration:none;
+                                      padding:14px 36px; border-radius:6px; font-size:16px; font-weight:bold;">
+                                Complete Payment Now
+                            </a>
+                        </div>
+
+                        <p style="color:#777777; font-size:13px; line-height:1.6; margin:0;">
+                            If you no longer wish to place this order, you can ignore this email and
+                            the order will be cancelled automatically.
+                        </p>
+
+                    </td>
+                </tr>
+
+                <!-- FOOTER -->
+                <tr>
+                    <td style="background-color:#f8f8f8; padding:20px 40px; text-align:center; border-top:1px solid #eeeeee;">
+                        <p style="color:#aaaaaa; font-size:12px; margin:0;">
+                            © 2026 Hero Bike Store. All rights reserved.
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

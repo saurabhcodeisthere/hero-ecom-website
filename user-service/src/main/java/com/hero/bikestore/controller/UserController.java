@@ -1,83 +1,136 @@
 package com.hero.bikestore.controller;
 
+import com.hero.bikestore.dto.request.SaveAddressRequest;
+import com.hero.bikestore.dto.request.UpdateProfileRequest;
 import com.hero.bikestore.dto.response.ApiResponse;
+import com.hero.bikestore.dto.response.UserAddressResponse;
 import com.hero.bikestore.dto.response.UserResponse;
 import com.hero.bikestore.service.UserService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
-@Tag(
-        name = "Users",
-        description = "Fetch profile information for authenticated users. Requires JWT with CUSTOMER or ADMIN role."
-)
 public class UserController {
 
     private final UserService userService;
 
-    @Operation(
-            summary = "Get the currently authenticated user",
-            description = "Reads the JWT claims (email, name) and looks up — or auto-creates — the user record " +
-                          "in the local database. This is the entry-point that syncs Keycloak identity with the platform."
-    )
-    @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Current user returned successfully"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Missing or invalid JWT token", content = @Content),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Token valid but role insufficient", content = @Content)
-    })
+    // ─────────────────────────────────────────────────────────────────
+    // PROFILE
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * GET /api/v1/users
+     * Returns (or auto-creates) the currently authenticated user's profile.
+     */
     @GetMapping
     public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser() {
-
-        System.out.println("Controller reached");
-        UserResponse user = userService.getOrCreateUser();
-
-        return ResponseEntity.ok(
-                ApiResponse.<UserResponse>builder()
-                        .timestamp(LocalDateTime.now())
-                        .status(200)
-                        .message("Current User fetched successfully")
-                        .data(user)
-                        .build()
-        );
+        return ResponseEntity.ok(success("Current user fetched successfully", userService.getOrCreateUser()));
     }
 
-    @Operation(
-            summary = "Get a user by ID",
-            description = "Fetches the profile of any platform user by their internal database ID. " +
-                          "Accessible to both CUSTOMER and ADMIN roles."
-    )
-    @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "User found and returned"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "No user found with the given ID", content = @Content),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Missing or invalid JWT token", content = @Content)
-    })
+    /**
+     * GET /api/v1/users/{userId}
+     * Fetch any user by their internal DB id. Accessible to both CUSTOMER and ADMIN.
+     */
     @GetMapping("/{userId}")
-    public ResponseEntity<ApiResponse<UserResponse>> getUserById(
-            @Parameter(description = "Internal platform user ID", example = "1", required = true)
-            @PathVariable Long userId) {
+    public ResponseEntity<ApiResponse<UserResponse>> getUserById(@PathVariable Long userId) {
+        return ResponseEntity.ok(success("User fetched successfully", userService.getById(userId)));
+    }
 
-        UserResponse user = userService.getById(userId);
+    /**
+     * PATCH /api/v1/users/me
+     * Update the authenticated user's fullName and/or phone.
+     * Only fields present in the body are updated — null fields are ignored.
+     */
+    @PatchMapping("/me")
+    public ResponseEntity<ApiResponse<UserResponse>> updateProfile(
+            @Valid @RequestBody UpdateProfileRequest request) {
+        return ResponseEntity.ok(success("Profile updated successfully", userService.updateProfile(request)));
+    }
 
-        return ResponseEntity.ok(
-                ApiResponse.<UserResponse>builder()
-                        .timestamp(LocalDateTime.now())
-                        .status(200)
-                        .message("User fetched successfully")
-                        .data(user)
-                        .build()
-        );
+    // ─────────────────────────────────────────────────────────────────
+    // ADDRESSES
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * POST /api/v1/users/me/addresses
+     * Save a new delivery address. First address is automatically set as default.
+     */
+    @PostMapping("/me/addresses")
+    public ResponseEntity<ApiResponse<UserAddressResponse>> saveAddress(
+            @Valid @RequestBody SaveAddressRequest request) {
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(success("Address saved successfully", userService.saveAddress(request)));
+    }
+
+    /**
+     * GET /api/v1/users/me/addresses
+     * List all saved addresses for the authenticated user.
+     */
+    @GetMapping("/me/addresses")
+    public ResponseEntity<ApiResponse<List<UserAddressResponse>>> getMyAddresses() {
+        return ResponseEntity.ok(success("Addresses fetched successfully", userService.getMyAddresses()));
+    }
+
+    /**
+     * PATCH /api/v1/users/me/addresses/{addressId}/default
+     * Mark a saved address as the default delivery address.
+     */
+    @PatchMapping("/me/addresses/{addressId}/default")
+    public ResponseEntity<ApiResponse<UserAddressResponse>> setDefaultAddress(
+            @PathVariable Long addressId) {
+        return ResponseEntity.ok(success("Default address updated", userService.setDefaultAddress(addressId)));
+    }
+
+    /**
+     * DELETE /api/v1/users/me/addresses/{addressId}
+     * Delete a saved address. If it was the default, the next oldest address is promoted.
+     */
+    @DeleteMapping("/me/addresses/{addressId}")
+    public ResponseEntity<Void> deleteAddress(@PathVariable Long addressId) {
+        userService.deleteAddress(addressId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // INTERNAL — called by cart-service
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * GET /api/v1/users/addresses/{addressId}?userId={keycloakUserId}
+     *
+     * Internal endpoint — called by cart-service at checkout time to resolve
+     * an addressId into a full address object.
+     *
+     * The keycloakUserId param ensures cart-service can only fetch addresses
+     * that belong to the customer whose JWT it is forwarding. No customer can
+     * fetch another customer's address through this endpoint.
+     */
+    @GetMapping("/addresses/{addressId}")
+    public ResponseEntity<ApiResponse<UserAddressResponse>> getAddressById(
+            @PathVariable Long addressId,
+            @RequestParam String userId) {
+        return ResponseEntity.ok(success("Address fetched", userService.getAddressById(addressId, userId)));
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // HELPER
+    // ─────────────────────────────────────────────────────────────────
+
+    private <T> ApiResponse<T> success(String message, T data) {
+        return ApiResponse.<T>builder()
+                .timestamp(LocalDateTime.now())
+                .status(200)
+                .message(message)
+                .data(data)
+                .build();
     }
 }

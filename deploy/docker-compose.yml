@@ -232,6 +232,21 @@ services:
       - bikestore-network
     restart: unless-stopped
 
+  cart-service:
+    build: ../cart-service
+    container_name: cart-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    # No ports exposed — only reachable via gateway on port 7070
+    networks:
+      - bikestore-network
+    restart: unless-stopped
+
   # ─────────────────────────────────────────────────────────────
   # LAYER 4: API Gateway — starts last
   # ─────────────────────────────────────────────────────────────
@@ -252,6 +267,8 @@ services:
       order-service:
         condition: service_started
       payment-service:
+        condition: service_started
+      cart-service:
         condition: service_started
     ports:
       - "7070:7070"

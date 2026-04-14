@@ -62,4 +62,23 @@ public class PaymentController {
 
         return ResponseEntity.ok(result);
     }
+
+    /**
+     * Called by order-service timeout job when an AWAITING_PAYMENT order expires.
+     * Marks the payment as EXPIRED so the mock checkout page rejects any late submission.
+     *
+     * PATCH — we're updating a single field on an existing resource, not replacing it.
+     * Returns 204 No Content — caller needs no data back.
+     */
+    @PatchMapping("/{orderId}/expire")
+    public ResponseEntity<Void> expirePayment(@PathVariable String orderId) {
+        log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        log.info("[PaymentController] expirePayment | ENTER — orderId={}", orderId);
+
+        paymentService.expirePayment(orderId);
+
+        log.info("[PaymentController] expirePayment | EXIT — orderId={}", orderId);
+        log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        return ResponseEntity.noContent().build();
+    }
 }

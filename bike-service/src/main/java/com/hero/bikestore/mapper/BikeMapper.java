@@ -47,6 +47,7 @@ public class BikeMapper {
 
         response.setDescription(entity.getDescription());
         response.setImageUrl(entity.getImageUrl());
+        response.setActive(entity.isActive());
 
         return response;
     }

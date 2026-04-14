@@ -1,5 +1,6 @@
 package com.hero.bikestore.dto.response;
 
+import com.hero.bikestore.entity.DeliveryAddress;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -29,7 +30,10 @@ public class AdminOrderResponse {
 
     private String status;
     private BigDecimal totalAmount;
-    private String shippingAddress;
+
+    // Structured address — admin can see full address including phone number
+    private DeliveryAddress shippingAddress;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<OrderItemResponse> items;

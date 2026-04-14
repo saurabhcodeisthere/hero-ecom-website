@@ -39,6 +39,12 @@ spring:
         jwt:
           jwk-set-uri: http://keycloak:8080/realms/hero-ecommerce/protocol/openid-connect/certs
 
+  # Scheduler thread pool for @Scheduled jobs (PaymentTimeoutJob)
+  task:
+    scheduling:
+      pool:
+        size: 2             # 2 threads: one for timeout job, one reserved
+
 # ─────────────────────────────────────────────────────────────────────────────
 # RESILIENCE4J — Circuit Breaker + Retry
 # ─────────────────────────────────────────────────────────────────────────────
@@ -87,3 +93,14 @@ logging:
   level:
     root: INFO
     com.hero.bikestore: INFO
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PAYMENT TIMEOUT JOB
+# ─────────────────────────────────────────────────────────────────────────────
+payment:
+  timeout:
+    warning-minutes: 2      # TEST VALUE — change to 10 in production
+    cancel-minutes: 3       # TEST VALUE — change to 15 in production
+    check:
+      interval-ms: 20000    # TEST VALUE — job polls every 20 seconds
+    initial-delay-ms: 5000  # TEST VALUE — first run 5 seconds after startup

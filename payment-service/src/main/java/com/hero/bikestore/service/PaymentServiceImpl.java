@@ -12,27 +12,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Orchestrates the payment initiation flow.
+ * Orchestrates the payment initiation and expiry flows.
  *
- * SRP: This class owns only the payment initiation business logic.
+ * SRP: This class owns only the payment business logic.
  *      - Does not know about RabbitMQ (depends on PaymentProcessor interface)
  *      - Does not know about Razorpay (depends on PaymentProcessor interface)
  *      - Does not know about HTTP (no controller logic here)
- *
- * Flow:
- *   1. Build and save Payment record with status INITIATED
- *   2. Call PaymentProcessor.initiate() to get checkout URL
- *      (MockPaymentProcessor in dev, RazorpayPaymentProcessor in prod)
- *   3. Update Payment record with the checkout URL
- *   4. Log the URL — developer opens this to simulate payment
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class PaymentServiceImpl implements PaymentService {
 
-    private final PaymentRepository  paymentRepository;
-    private final PaymentProcessor   paymentProcessor;
+    private final PaymentRepository paymentRepository;
+    private final PaymentProcessor  paymentProcessor;
 
     @Override
     @Transactional
@@ -41,7 +34,6 @@ public class PaymentServiceImpl implements PaymentService {
         log.info("[PaymentServiceImpl] orderId={} orderNumber={} amount={} userEmail={}",
                 command.getOrderId(), command.getOrderNumber(), command.getAmount(), command.getUserEmail());
 
-        // Step 1 — Save Payment record with INITIATED status
         log.info("[PaymentServiceImpl] STEP 1/3 — Saving Payment record to DB with status=INITIATED");
         Payment payment = Payment.builder()
                 .orderId(command.getOrderId())
@@ -56,19 +48,12 @@ public class PaymentServiceImpl implements PaymentService {
         log.info("[PaymentServiceImpl] STEP 1/3 — Payment record saved | dbId={} orderId={} status=INITIATED",
                 payment.getId(), payment.getOrderId());
 
-        // Step 2 — Call PaymentProcessor to get checkout URL
-        // Dev:  MockPaymentProcessor returns http://localhost:8086/mock/checkout/{uuid}
-        // Prod: RazorpayPaymentProcessor calls Razorpay SDK, returns real checkout URL
         log.info("[PaymentServiceImpl] STEP 2/3 — Calling {} to generate checkout URL",
                 paymentProcessor.getClass().getSimpleName());
         PaymentInitiationResult result = paymentProcessor.initiate(command);
         log.info("[PaymentServiceImpl] STEP 2/3 — Checkout URL generated | gatewayPaymentId={} paymentUrl={}",
                 result.getPaymentId(), result.getPaymentUrl());
 
-        // Step 3 — Update Payment record with gateway ID and checkout URL
-        // gatewayPaymentId is the key used to look up this record when the webhook fires
-        // Dev:  UUID embedded in mock checkout URL → http://localhost:8086/mock/checkout/{uuid}
-        // Prod: Razorpay orderId embedded in Razorpay checkout URL
         log.info("[PaymentServiceImpl] STEP 3/3 — Updating Payment record with gatewayPaymentId and paymentUrl");
         payment.setGatewayPaymentId(result.getPaymentId());
         payment.setPaymentUrl(result.getPaymentUrl());
@@ -78,8 +63,31 @@ public class PaymentServiceImpl implements PaymentService {
 
         log.info("[PaymentServiceImpl] initiatePayment | EXIT — orderId={} checkoutUrl={}",
                 command.getOrderId(), result.getPaymentUrl());
-
-        // Return result to caller — PaymentController sends paymentUrl back to order-service
         return result;
+    }
+
+    @Override
+    @Transactional
+    public void expirePayment(String orderId) {
+        log.info("[PaymentServiceImpl] expirePayment | ENTER — orderId={}", orderId);
+
+        paymentRepository.findByOrderId(orderId).ifPresentOrElse(
+            payment -> {
+                if (payment.getStatus() != PaymentStatus.INITIATED) {
+                    // Payment already resolved (SUCCESS / FAILED / EXPIRED).
+                    // This happens if customer paid just before the timeout job ran.
+                    log.info("[PaymentServiceImpl] expirePayment — skipping, already status={} | orderId={}",
+                            payment.getStatus(), orderId);
+                    return;
+                }
+                payment.setStatus(PaymentStatus.EXPIRED);
+                paymentRepository.save(payment);
+                log.info("[PaymentServiceImpl] expirePayment — payment set to EXPIRED | orderId={} gatewayPaymentId={}",
+                        orderId, payment.getGatewayPaymentId());
+            },
+            () -> log.warn("[PaymentServiceImpl] expirePayment — no payment record found | orderId={}", orderId)
+        );
+
+        log.info("[PaymentServiceImpl] expirePayment | EXIT — orderId={}", orderId);
     }
 }

@@ -10,5 +10,12 @@ package com.hero.bikestore.enums;
 public enum PaymentStatus {
     INITIATED,
     SUCCESS,
-    FAILED
+    FAILED,
+
+    /**
+     * Set by order-service timeout job when an AWAITING_PAYMENT order exceeds
+     * the cancellation threshold and no payment was received.
+     * Prevents the mock checkout page from accepting payment after the order is cancelled.
+     */
+    EXPIRED
 }

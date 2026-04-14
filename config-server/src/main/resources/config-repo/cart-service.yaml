@@ -1,0 +1,72 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CART SERVICE CONFIG
+# ─────────────────────────────────────────────────────────────────────────────
+
+spring:
+
+  datasource:
+    url: jdbc:postgresql://postgres:5432/cartdb
+    username: bikestore
+    password: bikestore
+  jpa:
+    hibernate:
+      ddl-auto: update          # Hibernate auto-creates cart_items table on first boot
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  # Keycloak JWT validation
+  # Using jwk-set-uri instead of issuer-uri:
+  # Token iss claim = http://localhost:9090 (external URL used when getting the token)
+  # Service runs inside Docker where Keycloak = http://keycloak:8080
+  # These URLs differ — issuer-uri validation would fail with 401.
+  # jwk-set-uri fetches the public key directly and validates only the signature.
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://keycloak:8080/realms/hero-ecommerce/protocol/openid-connect/certs
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RESILIENCE4J — Circuit Breaker + Retry for cart → order-service call
+# ─────────────────────────────────────────────────────────────────────────────
+resilience4j:
+  circuitbreaker:
+    instances:
+      cart-checkout:
+        # Evaluate failure rate after 5 calls in the sliding window
+        sliding-window-size: 5
+        # Open the circuit if 50% or more calls fail
+        failure-rate-threshold: 50
+        # Stay open for 20 seconds before allowing a test call through
+        wait-duration-in-open-state: 20s
+        # Allow 2 test calls when in half-open state
+        permitted-number-of-calls-in-half-open-state: 2
+        # RestClientException covers: connection refused, read timeout, 5xx errors
+        record-exceptions:
+          - org.springframework.web.client.RestClientException
+        # 4xx errors are business errors (empty cart, bad address) — not circuit failures
+        # These must reach the customer with the correct HTTP status
+        ignore-exceptions:
+          - org.springframework.web.client.HttpClientErrorException
+          - com.hero.bikestore.common.exception.base.BadRequestException
+
+  retry:
+    instances:
+      cart-checkout:
+        # Try 3 times total (1 initial + 2 retries)
+        max-attempts: 3
+        # Wait 500ms between attempts
+        wait-duration: 500ms
+        # Only retry I/O failures — a 400 or 409 will never succeed on retry
+        retry-exceptions:
+          - org.springframework.web.client.ResourceAccessException
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LOGGING
+# ─────────────────────────────────────────────────────────────────────────────
+logging:
+  level:
+    root: INFO
+    com.hero.bikestore: INFO

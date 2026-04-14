@@ -1,0 +1,12 @@
+# Bootstrap config — only what is needed BEFORE connecting to config-server.
+# All other config (datasource, security, resilience4j, logging) lives in
+# config-server/src/main/resources/config-repo/cart-service.yaml
+
+spring:
+  application:
+    name: cart-service                                   # tells config-server which file to serve
+  config:
+    import: "configserver:http://config-server:8888"    # where to fetch the rest of config
+
+server:
+  port: 8087

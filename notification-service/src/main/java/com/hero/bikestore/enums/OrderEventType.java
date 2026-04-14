@@ -15,5 +15,13 @@ public enum OrderEventType {
     ORDER_CONFIRMED,
     ORDER_SHIPPED,
     ORDER_DELIVERED,
-    ORDER_CANCELLED
+    ORDER_CANCELLED,
+
+    /**
+     * Sent by order-service timeout job when an AWAITING_PAYMENT order crosses
+     * the warning threshold but is still within the grace period.
+     * Routing key: order.payment.expiry.warning — matches binding "order.#" ✅
+     * Handled by: PaymentExpiryWarningHandler
+     */
+    ORDER_PAYMENT_EXPIRY_WARNING
 }

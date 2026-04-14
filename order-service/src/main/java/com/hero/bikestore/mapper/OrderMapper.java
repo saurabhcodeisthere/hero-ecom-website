@@ -3,8 +3,10 @@ package com.hero.bikestore.mapper;
 import com.hero.bikestore.dto.response.AdminOrderResponse;
 import com.hero.bikestore.dto.response.OrderItemResponse;
 import com.hero.bikestore.dto.response.OrderResponse;
+import com.hero.bikestore.entity.DeliveryAddress;
 import com.hero.bikestore.entity.Order;
 import com.hero.bikestore.entity.OrderItem;
+import com.hero.bikestore.entity.OrderStatus;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -34,7 +36,13 @@ public class OrderMapper {
                 .shippingAddress(order.getShippingAddress())
                 .createdAt(order.getCreatedAt())
                 .items(toItemResponseList(order.getItems()))
-                .paymentUrl(order.getPaymentUrl())   // null once order moves past AWAITING_PAYMENT
+                // Only expose the payment URL while the customer still needs to act on it.
+                // Once the order moves past AWAITING_PAYMENT the link is dead — returning it
+                // would mislead the frontend into thinking a "Pay Now" button is valid.
+                // The raw value is intentionally kept in the DB column for audit/support tracing.
+                .paymentUrl(order.getStatus() == OrderStatus.AWAITING_PAYMENT
+                        ? order.getPaymentUrl()
+                        : null)
                 .build();
     }
 

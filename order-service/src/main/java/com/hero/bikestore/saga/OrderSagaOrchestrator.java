@@ -60,6 +60,17 @@ public class OrderSagaOrchestrator implements SagaOrchestrator {
         log.info("[OrderSagaOrchestrator] STEP 1/2 — Order found | orderNumber={} currentStatus={}",
                 order.getOrderNumber(), order.getStatus());
 
+        // GUARD — only confirm if still AWAITING_PAYMENT
+        // CANCELLED = timeout job already cancelled this order before payment arrived
+        //             (race condition: customer paid just as timeout fired)
+        // CONFIRMED = duplicate event — already processed, skip safely
+        if (order.getStatus() != OrderStatus.AWAITING_PAYMENT) {
+            log.warn("[OrderSagaOrchestrator] handlePaymentSuccess — SKIPPED. Order is not AWAITING_PAYMENT | " +
+                     "orderNumber={} currentStatus={}. Order will NOT be confirmed.",
+                    order.getOrderNumber(), order.getStatus());
+            return;
+        }
+
         log.info("[OrderSagaOrchestrator] STEP 2/2 — Transitioning status {} → CONFIRMED", order.getStatus());
         order.setStatus(OrderStatus.CONFIRMED);
         orderRepository.save(order);
@@ -83,6 +94,16 @@ public class OrderSagaOrchestrator implements SagaOrchestrator {
         Order order = findOrder(event.getOrderId());
         log.info("[OrderSagaOrchestrator] STEP 1/3 — Order found | orderNumber={} currentStatus={}",
                 order.getOrderNumber(), order.getStatus());
+
+        // GUARD — only cancel if still AWAITING_PAYMENT
+        // CANCELLED = timeout job already cancelled this order — don't restore stock twice
+        // CONFIRMED = already confirmed (should not happen, but guard anyway)
+        if (order.getStatus() != OrderStatus.AWAITING_PAYMENT) {
+            log.warn("[OrderSagaOrchestrator] handlePaymentFailure — SKIPPED. Order is not AWAITING_PAYMENT | " +
+                     "orderNumber={} currentStatus={}. Stock will NOT be double-restored.",
+                    order.getOrderNumber(), order.getStatus());
+            return;
+        }
 
         // Compensation — restore stock for every item
         log.info("[OrderSagaOrchestrator] STEP 2/3 — Restoring stock for {} item(s) (compensation)",
@@ -149,7 +170,8 @@ public class OrderSagaOrchestrator implements SagaOrchestrator {
                     .occurredAt(Instant.now())
                     .items(itemEvents)
                     .totalAmount(order.getTotalAmount())
-                    .shippingAddress(order.getShippingAddress())
+                    .shippingAddress(order.getShippingAddress() != null
+                            ? order.getShippingAddress().toDisplayString() : null)
                     .metadata(OrderNotificationEvent.EventMetadata.builder().build())
                     .build();
 

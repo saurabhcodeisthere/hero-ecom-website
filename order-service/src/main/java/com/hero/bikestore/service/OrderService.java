@@ -26,6 +26,8 @@ import com.hero.bikestore.dto.payment.PaymentInitiationResult;
 import com.hero.bikestore.dto.payment.ProcessPaymentCommand;
 import com.hero.bikestore.publisher.EventPublisher;
 import com.hero.bikestore.repository.OrderRepository;
+import com.hero.bikestore.specification.OrderSpecification;
+import org.springframework.data.jpa.domain.Specification;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +44,7 @@ import org.springframework.web.client.RestClientException;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Optional;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -64,6 +68,11 @@ public class OrderService {
     /**
      * Places a new order.
      *
+     * Idempotency:
+     *   If idempotencyKey is non-null and an order with that key already exists,
+     *   the existing order is returned immediately — no duplicate is created.
+     *   This is safe for retries (network failure, double-click, @Retry annotation).
+     *
      * For each item:
      *   1. Call bike-service  → validate bike exists, snapshot name + price
      *   2. Call inventory-service → validate stock is available
@@ -76,9 +85,21 @@ public class OrderService {
     @Transactional
     @CircuitBreaker(name = "order-placement", fallbackMethod = "placeOrderFallback")
     @Retry(name = "order-placement")
-    public OrderResponse placeOrder(PlaceOrderRequest request, Jwt jwt) {
+    public OrderResponse placeOrder(PlaceOrderRequest request, String idempotencyKey, Jwt jwt) {
         String userId = jwt.getSubject();
         String userEmail = jwt.getClaimAsString("email");
+
+        // ── Idempotency check — return existing order if this key was already processed ──
+        // This handles: network retries, @Retry, double-click, frontend re-submission.
+        // The UNIQUE constraint on idempotency_key is the final DB-level safety net.
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            Optional<Order> existing = orderRepository.findByIdempotencyKey(idempotencyKey);
+            if (existing.isPresent()) {
+                log.info("Idempotency hit: returning existing order={} for key={}",
+                        existing.get().getOrderNumber(), idempotencyKey);
+                return orderMapper.toResponse(existing.get());
+            }
+        }
 
         log.info("Placing order for userId={}, itemCount={}", userId, request.getItems().size());
 
@@ -88,6 +109,7 @@ public class OrderService {
                 .userEmail(userEmail)
                 .status(OrderStatus.AWAITING_PAYMENT)
                 .shippingAddress(request.getShippingAddress())
+                .idempotencyKey(idempotencyKey)   // null is fine — column allows null
                 .totalAmount(BigDecimal.ZERO)
                 .build();
 
@@ -144,7 +166,7 @@ public class OrderService {
                 .orderNumber(saved.getOrderNumber())
                 .amount(saved.getTotalAmount())
                 .userEmail(saved.getUserEmail())
-                .userName(saved.getUserId())     // userId as userName — update when profile service added
+                .userName(saved.getUserEmail() != null ? saved.getUserEmail() : saved.getUserId())
                 .build();
 
         PaymentInitiationResult paymentResult = initiatePayment(paymentCommand);
@@ -169,7 +191,7 @@ public class OrderService {
      * Re-throws business exceptions (4xx) so they reach the client correctly.
      * Only connectivity failures (RestClientException) become 503.
      */
-    public OrderResponse placeOrderFallback(PlaceOrderRequest request, Jwt jwt, Throwable t) {
+    public OrderResponse placeOrderFallback(PlaceOrderRequest request, String idempotencyKey, Jwt jwt, Throwable t) {
         if (t instanceof BikeNotFoundException) throw (BikeNotFoundException) t;
         if (t instanceof InsufficientStockException) throw (InsufficientStockException) t;
         log.error("Circuit breaker triggered during placeOrder: {}", t.getMessage());
@@ -249,18 +271,21 @@ public class OrderService {
     // ═════════════════════════════════════════════════════════════════════════
 
     /**
-     * Returns all orders with pagination. Admin use only.
+     * Returns all orders with pagination and optional filters. Admin use only.
      *
-     * If status is provided, filters by that status.
-     * If status is null, returns all orders regardless of status.
+     * Any combination of status, city, state, pincode can be provided.
+     * Omitted parameters are ignored — the query returns all orders that
+     * match only the filters that were actually supplied.
+     *
+     * Uses JPA Specifications so the WHERE clause is built dynamically at runtime
+     * rather than having a separate repository method for every filter combination.
      */
     @Transactional(readOnly = true)
-    public PagedOrderResponse getAllOrders(int page, int size, OrderStatus status) {
-        Pageable pageable = PageRequest.of(page, size);
-
-        Page<Order> orderPage = (status != null)
-                ? orderRepository.findByStatusOrderByCreatedAtDesc(status, pageable)
-                : orderRepository.findAllByOrderByCreatedAtDesc(pageable);
+    public PagedOrderResponse getAllOrders(int page, int size, OrderStatus status,
+                                          String city, String state, String pincode) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Specification<Order> spec = OrderSpecification.withFilters(status, city, state, pincode);
+        Page<Order> orderPage = orderRepository.findAll(spec, pageable);
 
         List<AdminOrderResponse> orders = orderPage.getContent()
                 .stream()
@@ -482,7 +507,11 @@ public class OrderService {
                     .occurredAt(Instant.now())
                     .items(itemEvents)
                     .totalAmount(order.getTotalAmount())
-                    .shippingAddress(order.getShippingAddress())
+                    // shippingAddress is a DeliveryAddress object — convert to a readable
+                    // string for the notification event / email template
+                    .shippingAddress(order.getShippingAddress() != null
+                            ? order.getShippingAddress().toDisplayString()
+                            : null)
                     .metadata(OrderNotificationEvent.EventMetadata.builder().build())
                     .build();
 

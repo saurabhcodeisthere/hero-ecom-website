@@ -1,0 +1,1006 @@
+{
+  "info": {
+    "name": "Hero Ecom — Cart + User Service",
+    "description": "Full test coverage for user profile, saved addresses, and cart (add/update/remove/checkout) including failure scenarios.\n\nBefore running:\n1. Run '0. Get JWT Token (Customer)' or '0. Get JWT Token (Admin)' first.\n2. The collection auto-sets {{token}} and {{adminToken}} via the test scripts.\n3. Base URL is http://localhost:7070 (API Gateway).\n4. Keycloak is at http://localhost:9090.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",       "value": "http://localhost:7070" },
+    { "key": "keycloakUrl",   "value": "http://localhost:9090" },
+    { "key": "realm",         "value": "hero-ecommerce" },
+    { "key": "clientId",      "value": "hero-app" },
+    { "key": "token",         "value": "" },
+    { "key": "adminToken",    "value": "" },
+    { "key": "addressId",     "value": "" },
+    { "key": "address2Id",    "value": "" },
+    { "key": "cartItemId",    "value": "" }
+  ],
+  "item": [
+
+    {
+      "name": "0. Auth",
+      "item": [
+        {
+          "name": "Get JWT — Customer",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "const json = pm.response.json();",
+              "pm.collectionVariables.set('token', json.access_token);",
+              "pm.test('Got customer token', () => pm.expect(json.access_token).to.be.a('string'));"
+            ]}
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "password" },
+                { "key": "client_id",  "value": "{{clientId}}" },
+                { "key": "username",   "value": "testcustomer" },
+                { "key": "password",   "value": "Test@1234" }
+              ]
+            },
+            "url": "{{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token"
+          }
+        },
+        {
+          "name": "Get JWT — Admin",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "const json = pm.response.json();",
+              "pm.collectionVariables.set('adminToken', json.access_token);",
+              "pm.test('Got admin token', () => pm.expect(json.access_token).to.be.a('string'));"
+            ]}
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "password" },
+                { "key": "client_id",  "value": "{{clientId}}" },
+                { "key": "username",   "value": "testadmin" },
+                { "key": "password",   "value": "Admin@1234" }
+              ]
+            },
+            "url": "{{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token"
+          }
+        },
+        {
+          "name": "FAIL — No token → 401",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/users"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "1. User — Profile",
+      "item": [
+        {
+          "name": "GET /users — get or create profile",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json().data;",
+            "pm.test('Has id and email', () => { pm.expect(d.id).to.be.a('number'); pm.expect(d.email).to.be.a('string'); });",
+            "pm.test('active=true', () => pm.expect(d.active).to.be.true);"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/users"
+          }
+        },
+        {
+          "name": "GET /users — second call returns same user (idempotent)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Same user each time', () => pm.expect(pm.response.json().data.email).to.be.a('string'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/users"
+          }
+        },
+        {
+          "name": "PATCH /users/me — update fullName + phone",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json().data;",
+            "pm.test('fullName updated', () => pm.expect(d.fullName).to.eql('Saurabh Mishra'));",
+            "pm.test('phone updated', () => pm.expect(d.phone).to.eql('9876543210'));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Saurabh Mishra\",\n  \"phone\": \"9876543210\"\n}" },
+            "url": "{{baseUrl}}/api/v1/users/me"
+          }
+        },
+        {
+          "name": "PATCH /users/me — partial update (phone only)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('phone changed', () => pm.expect(pm.response.json().data.phone).to.eql('8765432109'));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"8765432109\"\n}" },
+            "url": "{{baseUrl}}/api/v1/users/me"
+          }
+        },
+        {
+          "name": "FAIL — PATCH /users/me — invalid phone (starts with 5)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"5123456789\"\n}" },
+            "url": "{{baseUrl}}/api/v1/users/me"
+          }
+        },
+        {
+          "name": "FAIL — PATCH /users/me — fullName too long (>100 chars)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"\n}" },
+            "url": "{{baseUrl}}/api/v1/users/me"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "2. User — Addresses",
+      "item": [
+        {
+          "name": "POST /users/me/addresses — save first address (auto-default)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "const d = pm.response.json().data;",
+            "pm.test('isDefault=true (first address)', () => pm.expect(d.isDefault).to.be.true);",
+            "pm.collectionVariables.set('addressId', d.id);",
+            "pm.test('Has id', () => pm.expect(d.id).to.be.a('number'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Saurabh Mishra\",\n  \"phone\": \"9876543210\",\n  \"streetLine1\": \"123 MG Road\",\n  \"streetLine2\": \"Near City Mall\",\n  \"city\": \"Mumbai\",\n  \"state\": \"Maharashtra\",\n  \"pincode\": \"400001\"\n}" },
+            "url": "{{baseUrl}}/api/v1/users/me/addresses"
+          }
+        },
+        {
+          "name": "POST /users/me/addresses — save second address (not default)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "const d = pm.response.json().data;",
+            "pm.test('isDefault=false (not first)', () => pm.expect(d.isDefault).to.be.false);",
+            "pm.collectionVariables.set('address2Id', d.id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Saurabh Mishra\",\n  \"phone\": \"9876543210\",\n  \"streetLine1\": \"456 Brigade Road\",\n  \"city\": \"Bengaluru\",\n  \"state\": \"Karnataka\",\n  \"pincode\": \"560001\"\n}" },
+            "url": "{{baseUrl}}/api/v1/users/me/addresses"
+          }
+        },
+        {
+          "name": "POST /users/me/addresses — save with isDefault=true (overrides current default)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.test('isDefault=true', () => pm.expect(pm.response.json().data.isDefault).to.be.true);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Saurabh Mishra\",\n  \"phone\": \"9876543210\",\n  \"streetLine1\": \"789 Park Street\",\n  \"city\": \"Kolkata\",\n  \"state\": \"West Bengal\",\n  \"pincode\": \"700016\",\n  \"isDefault\": true\n}" },
+            "url": "{{baseUrl}}/api/v1/users/me/addresses"
+          }
+        },
+        {
+          "name": "GET /users/me/addresses — list all addresses",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const list = pm.response.json().data;",
+            "pm.test('Returns array', () => pm.expect(list).to.be.an('array'));",
+            "pm.test('Has multiple addresses', () => pm.expect(list.length).to.be.gte(2));",
+            "const defaults = list.filter(a => a.isDefault);",
+            "pm.test('Exactly one default', () => pm.expect(defaults.length).to.eql(1));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/users/me/addresses"
+          }
+        },
+        {
+          "name": "PATCH /users/me/addresses/:id/default — change default",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('isDefault=true on updated address', () => pm.expect(pm.response.json().data.isDefault).to.be.true);"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/users/me/addresses/{{addressId}}/default"
+          }
+        },
+        {
+          "name": "DELETE /users/me/addresses/:id — delete non-default address",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/users/me/addresses/{{address2Id}}"
+          }
+        },
+        {
+          "name": "DELETE /users/me/addresses/:id — delete default (next oldest promoted)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/users/me/addresses/{{addressId}}"
+          }
+        },
+        {
+          "name": "FAIL — POST /users/me/addresses — invalid phone",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Test User\",\n  \"phone\": \"1234567890\",\n  \"streetLine1\": \"123 Test St\",\n  \"city\": \"Delhi\",\n  \"state\": \"Delhi\",\n  \"pincode\": \"110001\"\n}" },
+            "url": "{{baseUrl}}/api/v1/users/me/addresses"
+          }
+        },
+        {
+          "name": "FAIL — POST /users/me/addresses — invalid pincode (starts with 0)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Test User\",\n  \"phone\": \"9876543210\",\n  \"streetLine1\": \"123 Test St\",\n  \"city\": \"Delhi\",\n  \"state\": \"Delhi\",\n  \"pincode\": \"012345\"\n}" },
+            "url": "{{baseUrl}}/api/v1/users/me/addresses"
+          }
+        },
+        {
+          "name": "FAIL — POST /users/me/addresses — missing required fields",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Test User\"\n}" },
+            "url": "{{baseUrl}}/api/v1/users/me/addresses"
+          }
+        },
+        {
+          "name": "FAIL — DELETE address that doesn't exist → 404",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/users/me/addresses/999999"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "3. Cart — Add Items",
+      "item": [
+        {
+          "name": "POST /cart/items — add bike (qty 1)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json();",
+            "pm.test('itemCount >= 1', () => pm.expect(body.itemCount).to.be.gte(1));",
+            "pm.test('cartTotal > 0', () => pm.expect(parseFloat(body.cartTotal)).to.be.gt(0));",
+            "if (body.items && body.items.length > 0) {",
+            "  pm.collectionVariables.set('cartItemId', body.items[0].cartItemId);",
+            "}"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"bikeId\": 1,\n  \"quantity\": 1\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/items"
+          }
+        },
+        {
+          "name": "POST /cart/items — add same bike again (quantity increments)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "const first = pm.response.json().items.find(i => i.bikeId === 1);",
+            "pm.test('qty incremented to 2', () => pm.expect(first.quantity).to.eql(2));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"bikeId\": 1,\n  \"quantity\": 1\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/items"
+          }
+        },
+        {
+          "name": "POST /cart/items — add second bike",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.test('itemCount is 2', () => pm.expect(pm.response.json().itemCount).to.eql(2));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"bikeId\": 2,\n  \"quantity\": 1\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/items"
+          }
+        },
+        {
+          "name": "FAIL — Add non-existent bike → 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"bikeId\": 99999,\n  \"quantity\": 1\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/items"
+          }
+        },
+        {
+          "name": "FAIL — Add with quantity 0 → 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"bikeId\": 1,\n  \"quantity\": 0\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/items"
+          }
+        },
+        {
+          "name": "FAIL — Add with quantity 11 → 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"bikeId\": 1,\n  \"quantity\": 11\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/items"
+          }
+        },
+        {
+          "name": "FAIL — Add without bikeId → 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"quantity\": 1\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/items"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "4. Cart — View & Update",
+      "item": [
+        {
+          "name": "GET /cart — view current cart",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('Has items array', () => pm.expect(body.items).to.be.an('array'));",
+            "pm.test('itemCount matches items length', () => pm.expect(body.itemCount).to.eql(body.items.length));",
+            "pm.test('cartTotal is number', () => pm.expect(parseFloat(body.cartTotal)).to.be.a('number'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/cart"
+          }
+        },
+        {
+          "name": "PATCH /cart/items/:id — update quantity to 3",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const updated = pm.response.json().items.find(i => i.cartItemId === parseInt(pm.collectionVariables.get('cartItemId')));",
+            "pm.test('Quantity is 3', () => pm.expect(updated.quantity).to.eql(3));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"quantity\": 3\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/items/{{cartItemId}}"
+          }
+        },
+        {
+          "name": "FAIL — PATCH /cart/items/:id — quantity 0 → 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"quantity\": 0\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/items/{{cartItemId}}"
+          }
+        },
+        {
+          "name": "FAIL — PATCH /cart/items/999999 — not found → 404",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"quantity\": 2\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/items/999999"
+          }
+        },
+        {
+          "name": "DELETE /cart/items/:id — remove single item",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const ids = pm.response.json().items.map(i => i.cartItemId);",
+            "pm.test('Removed item is gone', () => pm.expect(ids).to.not.include(parseInt(pm.collectionVariables.get('cartItemId'))));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/cart/items/{{cartItemId}}"
+          }
+        },
+        {
+          "name": "FAIL — DELETE /cart/items/999999 — not found → 404",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/cart/items/999999"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "5. Cart — Checkout",
+      "item": [
+        {
+          "name": "SETUP — Re-add bike to cart before checkout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"bikeId\": 1,\n  \"quantity\": 1\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/items"
+          }
+        },
+        {
+          "name": "SETUP — Save address for checkout",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const d = pm.response.json().data;",
+            "pm.collectionVariables.set('addressId', d.id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Saurabh Mishra\",\n  \"phone\": \"9876543210\",\n  \"streetLine1\": \"123 MG Road\",\n  \"city\": \"Mumbai\",\n  \"state\": \"Maharashtra\",\n  \"pincode\": \"400001\"\n}" },
+            "url": "{{baseUrl}}/api/v1/users/me/addresses"
+          }
+        },
+        {
+          "name": "POST /cart/checkout — Mode 1: addressId (saved address)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json();",
+            "pm.test('Has orderId', () => pm.expect(body.orderId).to.be.a('number'));",
+            "pm.test('Has orderNumber', () => pm.expect(body.orderNumber).to.be.a('string'));",
+            "pm.test('Has message', () => pm.expect(body.message).to.include('Order placed'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"addressId\": {{addressId}}\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/checkout"
+          }
+        },
+        {
+          "name": "VERIFY — Cart is empty after successful checkout",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Cart cleared after checkout', () => pm.expect(pm.response.json().itemCount).to.eql(0));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/cart"
+          }
+        },
+        {
+          "name": "SETUP — Re-add bike for inline address checkout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"bikeId\": 1,\n  \"quantity\": 1\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/items"
+          }
+        },
+        {
+          "name": "POST /cart/checkout — Mode 2: inline shippingAddress",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.test('Has orderId', () => pm.expect(pm.response.json().orderId).to.be.a('number'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"shippingAddress\": {\n    \"fullName\": \"Saurabh Mishra\",\n    \"phone\": \"9876543210\",\n    \"streetLine1\": \"456 Brigade Road\",\n    \"streetLine2\": \"Opp. Garuda Mall\",\n    \"city\": \"Bengaluru\",\n    \"state\": \"Karnataka\",\n    \"pincode\": \"560001\"\n  }\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/checkout"
+          }
+        },
+        {
+          "name": "FAIL — Checkout with empty cart → 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+            "pm.test('Error mentions empty cart', () => pm.expect(pm.response.json().message).to.include('empty'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"addressId\": {{addressId}}\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/checkout"
+          }
+        },
+        {
+          "name": "SETUP — Add bike for failure checkouts",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"bikeId\": 1,\n  \"quantity\": 1\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/items"
+          }
+        },
+        {
+          "name": "FAIL — Checkout with no address provided → 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": "{{baseUrl}}/api/v1/cart/checkout"
+          }
+        },
+        {
+          "name": "FAIL — Checkout with non-existent addressId → 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"addressId\": 999999\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/checkout"
+          }
+        },
+        {
+          "name": "FAIL — Checkout inline — invalid phone in address → 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"shippingAddress\": {\n    \"fullName\": \"Saurabh\",\n    \"phone\": \"1234567890\",\n    \"streetLine1\": \"123 Test St\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"400001\"\n  }\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/checkout"
+          }
+        },
+        {
+          "name": "FAIL — Checkout inline — missing required address fields → 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"shippingAddress\": {\n    \"fullName\": \"Saurabh\"\n  }\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/checkout"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "6. Cart — Clear",
+      "item": [
+        {
+          "name": "SETUP — Add bike before clear test",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"bikeId\": 1,\n  \"quantity\": 1\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/items"
+          }
+        },
+        {
+          "name": "DELETE /cart — clear entire cart",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/cart"
+          }
+        },
+        {
+          "name": "GET /cart — verify cart is empty after clear",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('itemCount = 0', () => pm.expect(pm.response.json().itemCount).to.eql(0));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/cart"
+          }
+        },
+        {
+          "name": "DELETE /cart — clear already-empty cart (safe, 204)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/cart"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "7. Admin — Cart",
+      "item": [
+        {
+          "name": "GET /admin/carts — list all active carts (admin)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/api/v1/admin/carts"
+          }
+        },
+        {
+          "name": "GET /admin/carts/:userId — view specific customer cart",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Has items array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/api/v1/admin/carts/KEYCLOAK_USER_UUID_HERE"
+          }
+        },
+        {
+          "name": "DELETE /admin/carts/:userId — clear customer cart",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/api/v1/admin/carts/KEYCLOAK_USER_UUID_HERE"
+          }
+        },
+        {
+          "name": "FAIL — GET /admin/carts with customer token → 403",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/admin/carts"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "8. Admin — Users",
+      "item": [
+        {
+          "name": "PATCH /admin/users/:id/block — block a user (admin)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('active=false', () => pm.expect(pm.response.json().data.active).to.be.false);"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/api/v1/admin/users/1/block"
+          }
+        },
+        {
+          "name": "PATCH /admin/users/:id/activate — restore user (admin)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('active=true', () => pm.expect(pm.response.json().data.active).to.be.true);"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/api/v1/admin/users/1/activate"
+          }
+        },
+        {
+          "name": "FAIL — Block non-existent user → 404",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/api/v1/admin/users/999999/block"
+          }
+        },
+        {
+          "name": "FAIL — Block user with customer token → 403",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/admin/users/1/block"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "9. Full Happy Path (E2E)",
+      "item": [
+        {
+          "name": "Step 1 — Get or create user profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/users"
+          }
+        },
+        {
+          "name": "Step 2 — Update profile (name + phone)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Saurabh Mishra\",\n  \"phone\": \"9876543210\"\n}" },
+            "url": "{{baseUrl}}/api/v1/users/me"
+          }
+        },
+        {
+          "name": "Step 3 — Save home address (auto-default)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.collectionVariables.set('addressId', pm.response.json().data.id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Saurabh Mishra\",\n  \"phone\": \"9876543210\",\n  \"streetLine1\": \"123 MG Road\",\n  \"streetLine2\": \"Near City Mall\",\n  \"city\": \"Mumbai\",\n  \"state\": \"Maharashtra\",\n  \"pincode\": \"400001\"\n}" },
+            "url": "{{baseUrl}}/api/v1/users/me/addresses"
+          }
+        },
+        {
+          "name": "Step 4 — Browse bikes (get bikeId to add)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/bikes"
+          }
+        },
+        {
+          "name": "Step 5 — Add bike to cart",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const items = pm.response.json().items;",
+            "if (items && items.length > 0) pm.collectionVariables.set('cartItemId', items[0].cartItemId);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"bikeId\": 1,\n  \"quantity\": 1\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/items"
+          }
+        },
+        {
+          "name": "Step 6 — View cart",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/cart"
+          }
+        },
+        {
+          "name": "Step 7 — Checkout using saved addressId",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.test('Order placed', () => pm.expect(pm.response.json().orderId).to.be.a('number'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"addressId\": {{addressId}}\n}" },
+            "url": "{{baseUrl}}/api/v1/cart/checkout"
+          }
+        },
+        {
+          "name": "Step 8 — Verify cart is cleared",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Cart empty after order', () => pm.expect(pm.response.json().itemCount).to.eql(0));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/cart"
+          }
+        },
+        {
+          "name": "Step 9 — View order history",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/v1/orders"
+          }
+        }
+      ]
+    }
+
+  ]
+}
